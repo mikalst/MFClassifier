@@ -43,6 +43,8 @@ def plot_distribution_per_woman(matrix_synthetic, matrix_original, sparse=False,
     plt.subplot(3, 2, 6)
     plt.hist(data4, bins = np.linspace(0, 4).astype(np.int), edgecolor='k')
     
+    plt.show()
+    
 def plot_distribution_per_age(matrix_synthetic, matrix_original, sparse=False, title_postfix=""):
     fig = plt.figure(figsize=(12, 10))
 
@@ -85,6 +87,8 @@ def plot_distribution_per_age(matrix_synthetic, matrix_original, sparse=False, t
 
     plt.subplot(3, 2, 6)
     plt.scatter(np.linspace(0, 320, 321), data4, marker="x")
+    
+    plt.show()
         
 def plot_sparsity(matrix_synthetic, matrix_original):
     fig = plt.figure(figsize=(12, 6))
@@ -96,6 +100,8 @@ def plot_sparsity(matrix_synthetic, matrix_original):
     plt.subplot(1, 2, 2)
     plt.title("Original")
     out = plt.spy(matrix_original, aspect="auto", markersize=0.06)
+    
+    plt.show()
     
 def plot_visual(matrix_synthetic, matrix_original, titles=("Synthetic", "Original")):
     fig = plt.figure(figsize=(12, 6))
@@ -110,4 +116,6 @@ def plot_visual(matrix_synthetic, matrix_original, titles=("Synthetic", "Origina
     plt.subplot(1, 2, 2)
     plt.title(titles[1])
     out = plt.imshow(matrix_original.todense(), aspect="auto")
+    
+    plt.show()
     

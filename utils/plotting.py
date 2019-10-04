@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse
 
+import src.utils.stats
+
 def plot_distribution_per_woman(matrix_synthetic, matrix_original, sparse=False, title_postfix=""):
     fig = plt.figure(figsize=(12, 12))
 
@@ -48,19 +50,8 @@ def plot_distribution_per_woman(matrix_synthetic, matrix_original, sparse=False,
 def plot_distribution_per_age(matrix_synthetic, matrix_original, sparse=False, title_postfix=""):
     fig = plt.figure(figsize=(12, 10))
 
-    if scipy.sparse.issparse(matrix_synthetic):
-        data1 = np.sum(matrix_synthetic == 3, axis=0).A1 / np.sum(matrix_synthetic == 3)
-        data3 = np.sum(matrix_synthetic == 4, axis=0).A1 / np.sum(matrix_synthetic == 4)
-        data5 = np.sum(matrix_synthetic != 0, axis=0).A1 / matrix_synthetic.count_nonzero()
-        
-    else:
-        data1 = np.sum(matrix_synthetic == 3, axis=0) / np.sum(matrix_synthetic == 3)
-        data3 = np.sum(matrix_synthetic == 4, axis=0) / np.sum(matrix_synthetic == 4)
-        data5 = np.sum(matrix_synthetic != 0, axis=0) / np.sum(matrix_synthetic != 0)
-        
-    data2 = np.sum(matrix_original == 3, axis=0).A1 / np.sum(matrix_original == 3)
-    data4 = np.sum(matrix_original == 4, axis=0).A1 / np.sum(matrix_original == 4)
-    data6 = np.sum(matrix_original != 0, axis=0).A1 / matrix_original.count_nonzero()
+    data1, data3, data5 = src.utils.stats.distribution_per_age(matrix_synthetic)
+    data2, data4, data6 = src.utils.stats.distribution_per_age(matrix_original)
     
     plt.subplot(3, 2, 1)
     plt.title("Synthetic" + title_postfix)
@@ -104,7 +95,7 @@ def plot_sparsity(matrix_synthetic, matrix_original):
     plt.show()
     
 def plot_visual(matrix_synthetic, matrix_original, titles=("Synthetic", "Original")):
-    fig = plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(14, 6))
 
     plt.subplot(1, 2, 1)
     plt.title(titles[0])
@@ -112,10 +103,12 @@ def plot_visual(matrix_synthetic, matrix_original, titles=("Synthetic", "Origina
         out = plt.imshow(matrix_synthetic.todense(), aspect="auto")
     else:
         out = plt.imshow(matrix_synthetic, aspect="auto")
+    out = plt.colorbar()
 
     plt.subplot(1, 2, 2)
     plt.title(titles[1])
     out = plt.imshow(matrix_original.todense(), aspect="auto")
+    out = plt.colorbar()
     
     plt.show()
     

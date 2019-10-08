@@ -99,6 +99,4 @@ class RidgePenalty:
         self.iteration += 1
         
         return self.iteration
-
-    
-    
+        

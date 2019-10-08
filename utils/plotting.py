@@ -2,24 +2,25 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse
 
-import src.utils.stats
+# Import local files
+from .stats import distribution_per_age
 
-def plot_distribution_per_woman(matrix_synthetic, matrix_original, sparse=False, title_postfix=""):
+def plot_distribution_per_woman(matrix1, matrix2, sparse=False, title_postfix=""):
     fig = plt.figure(figsize=(12, 12))
 
-    if scipy.sparse.issparse(matrix_synthetic):
-        data1 = np.sum(matrix_synthetic == 3, axis=1).A1
-        data3 = np.sum(matrix_synthetic == 4, axis=1).A1
-        data5 = np.sum(matrix_synthetic != 0, axis=1).A1
+    if scipy.sparse.issparse(matrix1):
+        data1 = np.sum(matrix1 == 3, axis=1).A1
+        data3 = np.sum(matrix1 == 4, axis=1).A1
+        data5 = np.sum(matrix1 != 0, axis=1).A1
         
     else:
-        data1 = np.sum(matrix_synthetic == 3, axis=1)
-        data3 = np.sum(matrix_synthetic == 4, axis=1)
-        data5 = np.sum(matrix_synthetic != 0, axis=1)
+        data1 = np.sum(matrix1 == 3, axis=1)
+        data3 = np.sum(matrix1 == 4, axis=1)
+        data5 = np.sum(matrix1 != 0, axis=1)
         
-    data2 = np.sum(matrix_original == 3, axis=1).A1
-    data4 = np.sum(matrix_original == 4, axis=1).A1
-    data6 = np.sum(matrix_original != 0, axis=1).A1
+    data2 = np.sum(matrix2 == 3, axis=1).A1
+    data4 = np.sum(matrix2 == 4, axis=1).A1
+    data6 = np.sum(matrix2 != 0, axis=1).A1
     
     plt.subplot(3, 2, 1)
     plt.title("Synthetic" + title_postfix)
@@ -47,11 +48,11 @@ def plot_distribution_per_woman(matrix_synthetic, matrix_original, sparse=False,
     
     plt.show()
     
-def plot_distribution_per_age(matrix_synthetic, matrix_original, sparse=False, title_postfix=""):
+def plot_distribution_per_age(matrix1, matrix2, sparse=False, title_postfix=""):
     fig = plt.figure(figsize=(12, 10))
 
-    data1, data3, data5 = src.utils.stats.distribution_per_age(matrix_synthetic)
-    data2, data4, data6 = src.utils.stats.distribution_per_age(matrix_original)
+    data1, data3, data5 = distribution_per_age(matrix1)
+    data2, data4, data6 = distribution_per_age(matrix2)
     
     plt.subplot(3, 2, 1)
     plt.title("Synthetic" + title_postfix)
@@ -81,33 +82,36 @@ def plot_distribution_per_age(matrix_synthetic, matrix_original, sparse=False, t
     
     plt.show()
         
-def plot_sparsity(matrix_synthetic, matrix_original):
+def plot_sparsity(matrix1, matrix2):
     fig = plt.figure(figsize=(12, 6))
 
     plt.subplot(1, 2, 1)
     plt.title("Synthetic masked")
-    out = plt.spy(matrix_synthetic, aspect="auto", markersize=0.06)
+    out = plt.spy(matrix1, aspect="auto", markersize=0.06)
 
     plt.subplot(1, 2, 2)
     plt.title("Original")
-    out = plt.spy(matrix_original, aspect="auto", markersize=0.06)
+    out = plt.spy(matrix2, aspect="auto", markersize=0.06)
     
     plt.show()
     
-def plot_visual(matrix_synthetic, matrix_original, titles=("Synthetic", "Original")):
+def plot_visual(matrix1, matrix2, titles=("Synthetic", "Original")):
     fig = plt.figure(figsize=(14, 6))
 
     plt.subplot(1, 2, 1)
     plt.title(titles[0])
-    if scipy.sparse.issparse(matrix_synthetic):
-        out = plt.imshow(matrix_synthetic.todense(), aspect="auto")
+    if scipy.sparse.issparse(matrix1):
+        out = plt.imshow(matrix1.todense(), aspect="auto")
     else:
-        out = plt.imshow(matrix_synthetic, aspect="auto")
+        out = plt.imshow(matrix1, aspect="auto")
     out = plt.colorbar()
 
     plt.subplot(1, 2, 2)
     plt.title(titles[1])
-    out = plt.imshow(matrix_original.todense(), aspect="auto")
+    if scipy.sparse.issparse(matrix2):
+        out = plt.imshow(matrix2.todense(), aspect="auto")
+    else:
+        out = plt.imshow(matrix2, aspect="auto")
     out = plt.colorbar()
     
     plt.show()

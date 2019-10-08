@@ -32,3 +32,43 @@ def simulate_mask(X, f_of_t, expectation_of_priors=np.array([0.028, 0.023, 0.192
         mask[r <= p, t+1] = True
         
     return mask
+
+def simulate_ordinal_from_float(matrix, pdf, kernel_parameter=1.0):
+    
+    matrix = (matrix - matrix.mean())/np.std(matrix) + 1.0
+
+    dom = np.array([1, 2, 3, 4])
+    distribution = lambda x, dom: np.exp(-kernel_parameter*np.abs(x - dom))
+    neighbours = lambda x, y: np.abs(x - y) <= 1
+
+    res = np.empty_like(matrix)
+    
+    dom_repeated = np.repeat(dom, matrix.shape[0]).reshape((matrix.shape[0], 4), order='F')
+
+    # Initialization
+    column_repeated = np.repeat(matrix[:, 0], 4).reshape((matrix.shape[0], 4), order='C')
+
+    d = distribution(column_repeated, dom_repeated) * pdf
+    cdf = np.cumsum(d / np.reshape(np.sum(d, axis=1), (matrix.shape[0], 1)), axis=1)
+    u = np.random.uniform(size=(matrix.shape[0], 1))
+    indices = np.argmax(u <= cdf, axis=1)
+
+    res[:, 0] = dom[indices]
+
+    for j in range(1, matrix.shape[1]):
+
+        column_repeated = np.repeat(matrix[:, j], 4).reshape((matrix.shape[0], 4), order='C')
+        last_int_column_repeated = np.repeat(res[:, j-1], 4).reshape((matrix.shape[0], 4), order='C')
+        dom_repeated = np.repeat(dom, matrix.shape[0]).reshape((matrix.shape[0], 4), order='F')
+        is_neighbours = neighbours(last_int_column_repeated, dom_repeated)
+
+        d = distribution(column_repeated, dom_repeated) * is_neighbours * pdf
+        cdf = np.cumsum(d / np.reshape(np.sum(d, axis=1), (matrix.shape[0], 1)), axis=1)
+
+        u = np.random.uniform(size=(matrix.shape[0], 1))
+
+        indices = np.argmax(u <= cdf, axis=1)
+
+        res[:, j] = dom[indices]
+    
+    return res

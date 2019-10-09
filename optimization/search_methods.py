@@ -173,7 +173,7 @@ def linesearch(f, g, x_k, p_k, c1, c2, wolfe='s', verbosity=0):
             
             else:
                 print('Wolfe condition should be {\'s\', \'w\'}, \ndefaulting to strong ...')
-                return zoom(f, g, x_k, p_k, alpha_i, alpha_last, c1, c2, verbose)
+                return zoom(f, g, x_k, p_k, alpha_i, alpha_last, c1, c2, verbosity)
         
         alpha_last = alpha_i
         if alpha_max == np.inf:
@@ -183,7 +183,7 @@ def linesearch(f, g, x_k, p_k, c1, c2, wolfe='s', verbosity=0):
         i += 1
 
 
-def steepest_descent(f, g, x0, TOL = 1e-3, max_iter = 99, verbose=False):
+def steepest_descent(f, g, x0, TOL = 1e-3, max_iter = 99, verbosity=False):
     """Steepest descent algorithm for unconstrained minimization.
     
     Parameters
@@ -193,7 +193,7 @@ def steepest_descent(f, g, x0, TOL = 1e-3, max_iter = 99, verbose=False):
     x_k : initial point.
     TOL : maximum Euclidian-norm of gradient at local minimum.
     max_iter : maximum number of iterations.
-    verbose : flag for output.
+    verbosity : flag for output.
     
     Returns
     ----------
@@ -243,7 +243,7 @@ def bfgs(f, g, x0, TOL = 1e-3, max_iter = 99, linesearch_method = "ww", verbosit
     TOL : maximum Euclidian-norm of gradient at local minimum.
     max_iter : maximum number of iterations.
     linesearch_method : method to be used in linesearch. {bt, ww}
-    verbose : flag for output.
+    verbosity : flag for output.
     
     Returns
     ----------
@@ -252,7 +252,7 @@ def bfgs(f, g, x0, TOL = 1e-3, max_iter = 99, linesearch_method = "ww", verbosit
     f_final : value of objective at local minimum.
     x_k_list : all iterates of x_k."""
     
-    I = np.identity(len(x))
+    I = np.identity(len(x0))
     iterations = 1
     reset_to_SD_counter = 0
     x_k = x0
@@ -316,7 +316,7 @@ def fletcher_reeves(f, g, x0, TOL = 1e-3, max_iter = 99, verbosity=0):
     x : initial point.
     TOL : maximum Euclidian-norm of gradient at local minimum.
     max_iter : maximum number of iterations.
-    verbose : flag for output.
+    verbosity : flag for output.
     
     Returns
     ----------

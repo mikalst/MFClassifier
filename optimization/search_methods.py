@@ -28,8 +28,8 @@ def backtracking_linesearch(f, g, x_k, p_k, g_k, verbosity=0):
     ----------
     x_k+1 : point satisfying sufficient decrease, or point at which the linesearch 
             was terminated
-    success : Boolean value indicating the convergence of the linesearch."""
-    
+    success : Boolean value indicating the convergence of the linesearch.
+    """
     f0 = f(x_k)
     alpha = 1
     c1 = 0.2
@@ -71,8 +71,8 @@ def zoom(f, g, x_k, p_k, alpha_lo, alpha_hi, c1, c2, verbosity=0):
     ----------
     x_k+1 : point satisfying strong wolfe, or point at which the linesearch 
             was terminated
-    success : Boolean value indicating the convergence of the linesearch."""
-    
+    success : Boolean value indicating the convergence of the linesearch.
+    """
     f0 = f(x_k)
     g0 = g(x_k)
         
@@ -124,8 +124,8 @@ def linesearch(f, g, x_k, p_k, c1, c2, wolfe='s', verbosity=0):
     ----------
     x_k+1 : point satisfying strong wolfe, or point at which the linesearch 
             was terminated
-    success : Boolean value indicating the convergence of the linesearch."""
-
+    success : Boolean value indicating the convergence of the linesearch.
+    """
     alpha_0 = 0
     alpha_max = np.inf
     alpha_i = 1
@@ -200,8 +200,8 @@ def steepest_descent(f, g, x0, TOL = 1e-3, max_iter = 99, verbosity=False):
     x_k : obtained minimum.
     iterations : iterations used.
     f_final : value of objective at local minimum.
-    x_k_list : all iterates of x_k."""
-    
+    x_k_list : all iterates of x_k.
+    """
     x_k = x0
     x_k_list = []
     g_k = g(x_k)
@@ -250,8 +250,8 @@ def bfgs(f, g, x0, TOL = 1e-3, max_iter = 99, linesearch_method = "ww", verbosit
     x_k : obtained minimum.
     iterations : iterations used.
     f_final : value of objective at local minimum.
-    x_k_list : all iterates of x_k."""
-    
+    x_k_list : all iterates of x_k.
+    """
     I = np.identity(len(x0))
     iterations = 1
     reset_to_SD_counter = 0
@@ -323,8 +323,8 @@ def fletcher_reeves(f, g, x0, TOL = 1e-3, max_iter = 99, verbosity=0):
     x_k : obtained minimum.
     iterations : iterations used.
     f_final : value of objective at local minimum.
-    x_k_list : all iterates of x_k."""
-    
+    x_k_list : all iterates of x_k.
+    """
     x_k = x0
     
     x_k_list = []

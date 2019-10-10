@@ -1,9 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse
+import sklearn.decomposition
 
 # Import local files
 from .stats import distribution_per_age
+
 
 def plot_distribution_per_woman(matrix1, matrix2, sparse=False, title_postfix=""):
     fig = plt.figure(figsize=(12, 12))
@@ -116,3 +118,24 @@ def plot_visual(matrix1, matrix2, titles=("Synthetic", "Original")):
     
     plt.show()
     
+def plot_compare_svd_decomp_with_basis(S, path_to_basis):
+
+    original_singular_components = np.load(path_to_basis)
+    n_components = original_singular_components.shape[0]        
+
+    pca = sklearn.decomposition.PCA(n_components=n_components, copy=True, whiten=True,
+        svd_solver='auto', tol=0.0, iterated_power='auto',
+        random_state=None)
+    pca.fit(S)
+
+    plt.figure(figsize=(12, 4))
+    plt.subplot(1,2,1)
+    plt.title("Recovered")
+    for sc in pca.components_[:n_components]:
+        plt.plot(sc)
+        
+    plt.subplot(1,2,2)
+    plt.title("Original")
+    for sc in original_singular_components:
+        plt.plot(sc)
+    plt.show()

@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 class RidgePenalty:
     def __init__(self, kwargs):
@@ -99,4 +101,33 @@ class RidgePenalty:
         self.iteration += 1
         
         return self.iteration
-        
+
+    def plot(self):
+        fig = plt.figure(figsize=(12, 10))
+
+        plt.subplot2grid((2, 6), (0, 0), colspan=2)
+        plt.title("$U$")
+        plt.imshow(self.U, aspect='auto')
+        plt.colorbar(orientation='horizontal', fraction=0.10, pad=0.10)
+
+        plt.subplot2grid((2, 6), (0, 2), colspan=2)
+        plt.title("$V$")
+        plt.imshow(self.V, aspect='auto')
+        plt.colorbar(orientation='horizontal', fraction=0.10, pad=0.10)
+
+        plt.subplot2grid((2, 6), (0, 4), colspan=2)
+        plt.title("$V$")
+        for j in range(self.V.shape[1]):
+            plt.plot(self.V[:, j])
+
+        ax1 = plt.subplot2grid((2, 6), (1, 0), colspan=3)
+        plt.title("$S$")
+        plt.imshow(self.S, aspect='auto')
+        plt.colorbar(orientation='horizontal', fraction=0.10, pad=0.10)
+
+        plt.subplot2grid((2, 6), (1, 3), colspan=3, sharey=ax1)
+        plt.title("$X$")
+        plt.imshow(self.X, aspect='auto')
+        plt.colorbar(orientation='horizontal', fraction=0.10, pad=0.10)
+
+        fig.tight_layout()

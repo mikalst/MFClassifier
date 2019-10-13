@@ -103,8 +103,9 @@ class RidgePenalty:
         return self.iteration
 
     def plot(self):
-        fig = plt.figure(figsize=(12, 10))
+        fig = plt.figure(figsize=(12, 12))
 
+        # Plot U, V, S and X
         plt.subplot2grid((2, 6), (0, 0), colspan=2)
         plt.title("$U$")
         plt.imshow(self.U, aspect='auto')
@@ -131,3 +132,24 @@ class RidgePenalty:
         plt.colorbar(orientation='horizontal', fraction=0.10, pad=0.10)
 
         fig.tight_layout()
+        plt.show()
+
+        # Plot predictions for women with cancer
+        fig = plt.figure(figsize=(12, 10))
+
+        X_approx = self.U@self.V.T
+        X_approx_int = np.round(X_approx)
+        indices_with_risk = np.argwhere(np.any(self.X > 3, axis=1)).flatten()
+        np.random.seed(12)
+        indices = np.random.choice(indices_with_risk, size=16, replace=False)
+
+        for number,i in enumerate(indices):
+            plt.subplot(4, 4, number+1)
+            plt.plot(X_approx[i, :])
+            plt.plot(X_approx_int[i, :], linestyle='--')
+            x_i = (self.X[i, :])
+            nonzero_i = (x_i != 0)
+            plt.scatter(np.argwhere(nonzero_i), x_i[nonzero_i], color='k', marker='x')
+
+        fig.tight_layout()
+        plt.show()

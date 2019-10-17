@@ -49,6 +49,7 @@ def plot_distribution_per_woman(matrix1, matrix2, sparse=False, title_postfix=""
     plt.hist(data4, bins = np.linspace(0, 4).astype(np.int), edgecolor='k')
     plt.show()
     
+    
 def plot_distribution_per_age(matrix1, matrix2, sparse=False, title_postfix=""):
     fig = plt.figure(figsize=(12, 10))
 
@@ -81,7 +82,8 @@ def plot_distribution_per_age(matrix1, matrix2, sparse=False, title_postfix=""):
     plt.subplot(3, 2, 6)
     plt.scatter(np.linspace(0, 320, 321), data4, marker="x")
     plt.show()
-        
+
+
 def plot_sparsity(matrix1, matrix2):
     fig = plt.figure(figsize=(12, 6))
 
@@ -94,6 +96,7 @@ def plot_sparsity(matrix1, matrix2):
     out = plt.spy(matrix2, aspect="auto", markersize=0.06)
     plt.show()
     
+
 def plot_visual(matrix1, matrix2, titles=("Synthetic", "Original")):
     fig = plt.figure(figsize=(14, 6))
 
@@ -113,9 +116,9 @@ def plot_visual(matrix1, matrix2, titles=("Synthetic", "Original")):
         out = plt.imshow(matrix2, aspect="auto")
     out = plt.colorbar()
     plt.show()
-    
-def plot_compare_svd_decomp_with_basis(S, path_to_basis):
 
+
+def plot_compare_svd_with_basis(S, path_to_basis):
     original_singular_components = np.load(path_to_basis)
     n_components = original_singular_components.shape[0]        
 
@@ -133,5 +136,28 @@ def plot_compare_svd_decomp_with_basis(S, path_to_basis):
     plt.subplot(1,2,2)
     plt.title("Original")
     for sc in original_singular_components:
+        plt.plot(sc)
+    plt.show()
+
+    
+def plot_compare_svd_with_svd(X1, X2, n_components):
+    pca1 = sklearn.decomposition.PCA(n_components=n_components, copy=True, whiten=True,
+        svd_solver='auto', tol=0.0, iterated_power='auto',
+        random_state=None)
+    pca1.fit(X1)
+    pca2 = sklearn.decomposition.PCA(n_components=n_components, copy=True, whiten=True,
+        svd_solver='auto', tol=0.0, iterated_power='auto',
+        random_state=None)
+    pca2.fit(X2)
+
+    plt.figure(figsize=(12, 4))
+    plt.subplot(1,2,1)
+    plt.title("Recovered")
+    for sc in pca1.components_[:n_components]:
+        plt.plot(sc)
+        
+    plt.subplot(1,2,2)
+    plt.title("Original")
+    for sc in pca2.components_[:n_components]:
         plt.plot(sc)
     plt.show()

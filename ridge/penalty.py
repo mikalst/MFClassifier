@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 
 class RidgePenalty:
+
     def __init__(self, kwargs):
         self.lambda0 = kwargs['lambda0']
         self.lambda1 = kwargs['lambda1']
@@ -10,12 +11,23 @@ class RidgePenalty:
         self.lambda3 = kwargs['lambda3']
 
         self.X = kwargs['X']
+        self.Xtrain = np.copy(self.X)
+
+        if kwargs['predict_method'] == 'naive':
+            self.predict_entries = self.select_random_entries(percentage=0.10)
+            self.Xtrain[self.predict_entries] = 0.0
+
+        if kwargs['predict_method'] == 'realistic':
+            self.predict_rows = np.random.choice(np.arange(self.X.shape[0]), size=int(0.10*self.X.shape[0]), replace=False)
+            # Predict all entries after 25 yrs of age
+            self.Xtrain[self.predict_rows, 37:] = 0.0
+
         self.R = kwargs['R']
         self.J = kwargs['J']
         self.kappa = kwargs['kappa']
 
-        self.nonzero_rows = kwargs['nonzero_rows']
-        self.nonzero_cols = kwargs['nonzero_cols']
+        # Set nonzero rows and columns automatically after assigning predict X
+        self.nonzero_rows_Xtrain, self.nonzero_cols_Xtrain = np.nonzero(self.Xtrain)
         
         self.N = self.X.shape[0]
         self.T = self.X.shape[1]
@@ -23,13 +35,13 @@ class RidgePenalty:
         
         self.V = (np.ones(self.T*self.k) + (1 - np.random.uniform(size = self.T*self.k))).reshape((self.T, self.k))
         self.U = (np.ones(self.N*self.k) + (1 - np.random.uniform(size = self.N*self.k))).reshape((self.N, self.k))
-        self.S = self.X.copy()
+        self.S = self.Xtrain.copy()
         
         self.iteration = 0
         self.total_iterations = kwargs['total_iterations']
     
     def f(self, U, V):
-        return self.lambda0 * np.sum(np.power((self.X - U@V.T)[self.X != 0], 2)) + \
+        return self.lambda0 * np.sum(np.power((self.Xtrain - U@V.T)[self.Xtrain != 0], 2)) + \
             self.lambda1*np.linalg.norm(U)**2 + \
             self.lambda2*np.linalg.norm(V - self.J)**2 + \
             self.lambda3*np.linalg.norm(self.kappa@self.R@V)**2
@@ -83,7 +95,7 @@ class RidgePenalty:
     
     def solve3(self):        
         S = self.U@self.V.T
-        S[self.nonzero_rows, self.nonzero_cols] = self.X[self.nonzero_rows, self.nonzero_cols]
+        S[self.nonzero_rows_Xtrain, self.nonzero_cols_Xtrain] = self.Xtrain[self.nonzero_rows_Xtrain, self.nonzero_cols_Xtrain]
 
         return S
     
@@ -102,54 +114,69 @@ class RidgePenalty:
         
         return self.iteration
 
-    def plot(self):
-        fig = plt.figure(figsize=(12, 12))
+    def select_random_entries(self, percentage):
+        rows_repeated, cols_repeated = np.meshgrid(np.arange(self.X.shape[0], dtype=np.int),
+                                            np.arange(self.X.shape[1], dtype=np.int))
+        rows_repeated_flat = rows_repeated.flatten()
+        cols_repeated_flat = cols_repeated.flatten()
+        random_indices = np.random.choice(len(rows_repeated_flat), size=int(percentage * len(rows_repeated_flat)))
 
-        # Plot U, V, S and X
-        plt.subplot2grid((2, 6), (0, 0), colspan=2)
-        plt.title("$U$")
-        plt.imshow(self.U, aspect='auto')
-        plt.colorbar(orientation='horizontal', fraction=0.10, pad=0.10)
+        return rows_repeated_flat[random_indices], cols_repeated_flat[random_indices]
 
-        plt.subplot2grid((2, 6), (0, 2), colspan=2)
-        plt.title("$V$")
-        plt.imshow(self.V, aspect='auto')
-        plt.colorbar(orientation='horizontal', fraction=0.10, pad=0.10)
+def plot_ridge(ridge):
+    fig = plt.figure(figsize=(12, 12))
 
-        plt.subplot2grid((2, 6), (0, 4), colspan=2)
-        plt.title("$V$")
-        for j in range(self.V.shape[1]):
-            plt.plot(self.V[:, j])
+    # Plot U, V, S and X
+    plt.subplot2grid((2, 6), (0, 0), colspan=2)
+    plt.title("$U$")
+    plt.imshow(ridge.U, aspect='auto')
+    plt.colorbar(orientation='horizontal', fraction=0.10, pad=0.10)
 
-        ax1 = plt.subplot2grid((2, 6), (1, 0), colspan=3)
-        plt.title("$S$")
-        plt.imshow(self.S, aspect='auto')
-        plt.colorbar(orientation='horizontal', fraction=0.10, pad=0.10)
+    plt.subplot2grid((2, 6), (0, 2), colspan=2)
+    plt.title("$V$")
+    plt.imshow(ridge.V, aspect='auto')
+    plt.colorbar(orientation='horizontal', fraction=0.10, pad=0.10)
 
-        plt.subplot2grid((2, 6), (1, 3), colspan=3, sharey=ax1)
-        plt.title("$X$")
-        plt.imshow(self.X, aspect='auto')
-        plt.colorbar(orientation='horizontal', fraction=0.10, pad=0.10)
+    plt.subplot2grid((2, 6), (0, 4), colspan=2)
+    plt.title("$V$")
+    for j in range(ridge.V.shape[1]):
+        plt.plot(ridge.V[:, j])
 
-        fig.tight_layout()
-        plt.show()
+    ax1 = plt.subplot2grid((2, 6), (1, 0), colspan=3)
+    plt.title("$S$")
+    plt.imshow(ridge.S, aspect='auto')
+    plt.colorbar(orientation='horizontal', fraction=0.10, pad=0.10)
 
-        # Plot predictions for women with cancer
-        fig = plt.figure(figsize=(12, 10))
+    plt.subplot2grid((2, 6), (1, 3), colspan=3, sharey=ax1)
+    plt.title("$X$")
+    plt.imshow(ridge.X, aspect='auto')
+    plt.colorbar(orientation='horizontal', fraction=0.10, pad=0.10)
 
-        X_approx = self.U@self.V.T
-        X_approx_int = np.round(X_approx)
-        indices_with_risk = np.argwhere(np.any(self.X > 3, axis=1)).flatten()
-        np.random.seed(12)
-        indices = np.random.choice(indices_with_risk, size=16, replace=False)
+    fig.tight_layout()
+    plt.show()
 
-        for number,i in enumerate(indices):
-            plt.subplot(4, 4, number+1)
-            plt.plot(X_approx[i, :])
-            plt.plot(X_approx_int[i, :], linestyle='--')
-            x_i = (self.X[i, :])
-            nonzero_i = (x_i != 0)
-            plt.scatter(np.argwhere(nonzero_i), x_i[nonzero_i], color='k', marker='x')
+    # Plot predictions for women with cancer
+    fig = plt.figure(figsize=(12, 10))
 
-        fig.tight_layout()
-        plt.show()
+    X_approx = ridge.U@ridge.V.T
+    X_approx_int = np.round(X_approx)
+    indices_with_risk = np.argwhere(np.any(ridge.X > 3, axis=1)).flatten()
+    np.random.seed(12)
+    indices = np.random.choice(indices_with_risk, size=16, replace=False)
+
+    for number,i in enumerate(indices):
+        plt.subplot(4, 4, number+1)
+        plt.plot(X_approx[i, :])
+        plt.plot(X_approx_int[i, :], linestyle='--')
+        
+        # Plot predicted values in training set
+        x_i_train = (ridge.Xtrain[i, :])
+        plt.scatter(np.argwhere(x_i_train != 0), x_i_train[x_i_train != 0], color='k', marker='x')
+
+        # Plot predicted values not in training set
+        x_i = (ridge.X[i, :])
+        is_predicted = (x_i - x_i_train > 0)
+        plt.scatter(np.argwhere(is_predicted), x_i[is_predicted], color='g', marker='x')
+
+    fig.tight_layout()
+    plt.show()

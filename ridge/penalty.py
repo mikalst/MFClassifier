@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import sklearn.metrics
 
 
 class RidgePenalty:
-
     def __init__(self, kwargs):
         self.lambda0 = kwargs['lambda0']
         self.lambda1 = kwargs['lambda1']
@@ -13,14 +13,21 @@ class RidgePenalty:
         self.X = kwargs['X']
         self.Xtrain = np.copy(self.X)
 
+        self.predict_method = kwargs['predict_method']
         if kwargs['predict_method'] == 'naive':
             self.predict_entries = self.select_random_entries(percentage=0.10)
             self.Xtrain[self.predict_entries] = 0.0
 
         if kwargs['predict_method'] == 'realistic':
             self.predict_rows = np.random.choice(np.arange(self.X.shape[0]), size=int(0.10*self.X.shape[0]), replace=False)
-            # Predict all entries after 25 yrs of age
-            self.Xtrain[self.predict_rows, 37:] = 0.0
+            observation_window = 4
+
+            # Predict the 4th and subsequent entry 
+            is_nonzero = self.Xtrain[self.predict_rows] != 0
+            counts_nonzero = np.cumsum(is_nonzero, axis=1)
+            self.predict_first_cols = np.argmax(counts_nonzero == 5, axis=1)
+            for i, row in enumerate(self.predict_rows):
+                self.Xtrain[row, max(0, self.predict_first_cols[i] - observation_window):] = 0.0
 
         self.R = kwargs['R']
         self.J = kwargs['J']
@@ -115,13 +122,28 @@ class RidgePenalty:
         return self.iteration
 
     def select_random_entries(self, percentage):
-        rows_repeated, cols_repeated = np.meshgrid(np.arange(self.X.shape[0], dtype=np.int),
-                                            np.arange(self.X.shape[1], dtype=np.int))
-        rows_repeated_flat = rows_repeated.flatten()
-        cols_repeated_flat = cols_repeated.flatten()
-        random_indices = np.random.choice(len(rows_repeated_flat), size=int(percentage * len(rows_repeated_flat)))
+        nonzero_rows, nonzero_cols = np.nonzero(self.X)
+        random_indices = np.random.choice(
+            np.arange(len(nonzero_rows)),
+            size=int(percentage*len(nonzero_rows))
+        )
+        return nonzero_rows[random_indices], nonzero_cols[random_indices]
 
-        return rows_repeated_flat[random_indices], cols_repeated_flat[random_indices]
+    def confusion_matrix(self):
+        if self.predict_method == 'naive':
+            true = self.X[self.predict_entries]
+            pred = np.round((self.U@self.V.T)[self.predict_entries])
+            pred[pred < 1] = 1
+            pred[pred > 4] = 4
+            return sklearn.metrics.confusion_matrix(true, pred)
+            
+        elif self.predict_method == 'realistic':
+            true = self.X[self.predict_rows, self.predict_first_cols]
+            pred = np.round((self.U@self.V.T)[self.predict_rows, self.predict_first_cols])
+            pred[pred < 1] = 1
+            pred[pred > 4] = 4
+            return sklearn.metrics.confusion_matrix(true, pred)
+                
 
 def plot_ridge(ridge):
     fig = plt.figure(figsize=(12, 12))
@@ -155,13 +177,13 @@ def plot_ridge(ridge):
     fig.tight_layout()
     plt.show()
 
+    np.random.seed(12)
     # Plot predictions for women with cancer
     fig = plt.figure(figsize=(12, 10))
 
     X_approx = ridge.U@ridge.V.T
     X_approx_int = np.round(X_approx)
     indices_with_risk = np.argwhere(np.any(ridge.X > 3, axis=1)).flatten()
-    np.random.seed(12)
     indices = np.random.choice(indices_with_risk, size=16, replace=False)
 
     for number,i in enumerate(indices):

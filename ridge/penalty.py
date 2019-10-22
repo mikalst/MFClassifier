@@ -10,49 +10,67 @@ class RidgePenalty:
         self.lambda2 = kwargs['lambda2']
         self.lambda3 = kwargs['lambda3']
 
+        self.predict_method = kwargs['predict_method']
+
         self.X = kwargs['X']
         self.Xtrain = np.copy(self.X)
 
-        self.predict_method = kwargs['predict_method']
         if kwargs['predict_method'] == 'naive':
             self.predict_entries = self.select_random_entries(percentage=0.10)
             self.Xtrain[self.predict_entries] = 0.0
 
         if kwargs['predict_method'] == 'realistic':
-            self.predict_rows = np.random.choice(np.arange(self.X.shape[0]), size=int(0.10*self.X.shape[0]), replace=False)
-            observation_window = 4
+            self.predict_window = kwargs['predict_window']
+            predict_rows, predict_cols = [], []
 
-            # Predict the 4th and subsequent entry 
-            is_nonzero = self.Xtrain[self.predict_rows] != 0
+            row_candidates = np.random.choice(
+                np.arange(self.X.shape[0]), size=int(0.10*self.X.shape[0]), replace=False)
+            is_nonzero = self.Xtrain[row_candidates] != 0
             counts_nonzero = np.cumsum(is_nonzero, axis=1)
-            self.predict_first_cols = np.argmax(counts_nonzero == 5, axis=1)
-            for i, row in enumerate(self.predict_rows):
-                self.Xtrain[row, max(0, self.predict_first_cols[i] - observation_window):] = 0.0
+            # Find column index of 5th nonzero entry in row
+            col_candidates = np.argmax(counts_nonzero == 5, axis=1)
+            for i, row in enumerate(row_candidates):
+                if col_candidates[i] - self.predict_window > 5:
+                    self.Xtrain[row, col_candidates[i] -
+                                self.predict_window:] = 0.0
+                    predict_rows.append(row)
+                    predict_cols.append(col_candidates[i])
+
+            self.predict_rows = np.array(predict_rows)
+            self.predict_cols = np.array(predict_cols)
+
+        print(
+            'Assigning {:.2e} / {:.2e} observations to training'.format(
+                np.sum(self.Xtrain != 0), np.sum(self.X != 0))
+        )
 
         self.R = kwargs['R']
         self.J = kwargs['J']
         self.kappa = kwargs['kappa']
 
         # Set nonzero rows and columns automatically after assigning predict X
-        self.nonzero_rows_Xtrain, self.nonzero_cols_Xtrain = np.nonzero(self.Xtrain)
-        
+        self.nonzero_rows_Xtrain, self.nonzero_cols_Xtrain = np.nonzero(
+            self.Xtrain)
+
         self.N = self.X.shape[0]
         self.T = self.X.shape[1]
         self.k = kwargs['k']
-        
-        self.V = (np.ones(self.T*self.k) + (1 - np.random.uniform(size = self.T*self.k))).reshape((self.T, self.k))
-        self.U = (np.ones(self.N*self.k) + (1 - np.random.uniform(size = self.N*self.k))).reshape((self.N, self.k))
+
+        self.V = (np.ones(self.T*self.k) + (1 -
+                                            np.random.uniform(size=self.T*self.k))).reshape((self.T, self.k))
+        self.U = (np.ones(self.N*self.k) + (1 -
+                                            np.random.uniform(size=self.N*self.k))).reshape((self.N, self.k))
         self.S = self.Xtrain.copy()
-        
+
         self.iteration = 0
         self.total_iterations = kwargs['total_iterations']
-    
+
     def f(self, U, V):
         return self.lambda0 * np.sum(np.power((self.Xtrain - U@V.T)[self.Xtrain != 0], 2)) + \
             self.lambda1*np.linalg.norm(U)**2 + \
             self.lambda2*np.linalg.norm(V - self.J)**2 + \
             self.lambda3*np.linalg.norm(self.kappa@self.R@V)**2
-    
+
     def f1(self, u):
         U = u.reshape((self.N, self.k))
         return self.lambda0*np.linalg.norm(self.S - U@self.V.T)**2 + self.lambda1*np.linalg.norm(U)**2
@@ -60,12 +78,13 @@ class RidgePenalty:
     def g1(self, u):
         U = u.reshape((self.N, self.k))
         return (-2*self.lambda0*(self.S - U@self.V.T)@self.V + 2*self.lambda1*U).reshape(self.N*self.k)
-    
+
     def solve1(self):
-        U = (np.linalg.solve(self.V.T@self.V+(self.lambda1/self.lambda0)*np.identity(self.k), self.V.T@self.S.T)).T
-        
+        U = (np.linalg.solve(self.V.T@self.V+(self.lambda1/self.lambda0)
+                             * np.identity(self.k), self.V.T@self.S.T)).T
+
         return U
-    
+
     def f2(self, v):
         V = v.reshape((self.T, self.k))
 
@@ -85,40 +104,44 @@ class RidgePenalty:
         res3 = 2*self.lambda3*(kappaR).T@((kappaR)@V)
 
         return (res1 + res2 + res3).reshape(self.T*self.k)
-    
+
     def solve2(self):
-        L1, Q1 = np.linalg.eigh(self.U.T@self.U+(self.lambda2/self.lambda0)*np.identity(self.k))
+        L1, Q1 = np.linalg.eigh(
+            self.U.T@self.U+(self.lambda2/self.lambda0)*np.identity(self.k))
 
         kappaR = self.kappa@self.R
 
-        L2, Q2 = np.linalg.eigh((self.lambda3/self.lambda0)*(kappaR).T@(kappaR))
+        L2, Q2 = np.linalg.eigh(
+            (self.lambda3/self.lambda0)*(kappaR).T@(kappaR))
 
         # For efficiency purposes, these need to be evaluated in order
-        hatV = (Q2.T@(self.S.T@self.U+(self.lambda2/self.lambda0)*self.J))@Q1 / np.add.outer(L2, L1)
+        hatV = (Q2.T@(self.S.T@self.U+(self.lambda2/self.lambda0)
+                      * self.J))@Q1 / np.add.outer(L2, L1)
 
         V = Q2@(hatV@Q1.T)
 
         return V
-    
-    def solve3(self):        
+
+    def solve3(self):
         S = self.U@self.V.T
-        S[self.nonzero_rows_Xtrain, self.nonzero_cols_Xtrain] = self.Xtrain[self.nonzero_rows_Xtrain, self.nonzero_cols_Xtrain]
+        S[self.nonzero_rows_Xtrain,
+            self.nonzero_cols_Xtrain] = self.Xtrain[self.nonzero_rows_Xtrain, self.nonzero_cols_Xtrain]
 
         return S
-    
+
     def solve_inner(self):
         self.U = self.solve1()
         self.V = self.solve2()
         self.S = self.solve3()
-        return 
-    
+        return
+
     def __iter__(self):
         return self
 
     def __next__(self):
         self.solve_inner()
         self.iteration += 1
-        
+
         return self.iteration
 
     def select_random_entries(self, percentage):
@@ -135,15 +158,16 @@ class RidgePenalty:
             pred = np.round((self.U@self.V.T)[self.predict_entries])
             pred[pred < 1] = 1
             pred[pred > 4] = 4
-            return sklearn.metrics.confusion_matrix(true, pred)
-            
+            return np.unique(true), np.unique(pred), sklearn.metrics.confusion_matrix(true, pred)
+
         elif self.predict_method == 'realistic':
-            true = self.X[self.predict_rows, self.predict_first_cols]
-            pred = np.round((self.U@self.V.T)[self.predict_rows, self.predict_first_cols])
+            true = self.X[self.predict_rows, self.predict_cols]
+            pred = np.round((self.U@self.V.T)[
+                            self.predict_rows, self.predict_cols])
             pred[pred < 1] = 1
             pred[pred > 4] = 4
-            return sklearn.metrics.confusion_matrix(true, pred)
-                
+            return np.unique(true), np.unique(pred), sklearn.metrics.confusion_matrix(true, pred)
+
 
 def plot_ridge(ridge):
     fig = plt.figure(figsize=(12, 12))
@@ -186,19 +210,21 @@ def plot_ridge(ridge):
     indices_with_risk = np.argwhere(np.any(ridge.X > 3, axis=1)).flatten()
     indices = np.random.choice(indices_with_risk, size=16, replace=False)
 
-    for number,i in enumerate(indices):
+    for number, i in enumerate(indices):
         plt.subplot(4, 4, number+1)
         plt.plot(X_approx[i, :])
         plt.plot(X_approx_int[i, :], linestyle='--')
-        
+
         # Plot predicted values in training set
         x_i_train = (ridge.Xtrain[i, :])
-        plt.scatter(np.argwhere(x_i_train != 0), x_i_train[x_i_train != 0], color='k', marker='x')
+        plt.scatter(np.argwhere(x_i_train != 0),
+                    x_i_train[x_i_train != 0], color='k', marker='x')
 
         # Plot predicted values not in training set
         x_i = (ridge.X[i, :])
         is_predicted = (x_i - x_i_train > 0)
-        plt.scatter(np.argwhere(is_predicted), x_i[is_predicted], color='g', marker='x')
+        plt.scatter(np.argwhere(is_predicted),
+                    x_i[is_predicted], color='g', marker='x')
 
     fig.tight_layout()
     plt.show()

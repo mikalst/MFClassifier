@@ -158,7 +158,7 @@ class RidgePenalty:
             pred = np.round((self.U@self.V.T)[self.predict_entries])
             pred[pred < 1] = 1
             pred[pred > 4] = 4
-            return np.unique(true), np.unique(pred), sklearn.metrics.confusion_matrix(true, pred)
+            return sklearn.metrics.confusion_matrix(true, pred)
 
         elif self.predict_method == 'realistic':
             true = self.X[self.predict_rows, self.predict_cols]
@@ -166,7 +166,7 @@ class RidgePenalty:
                             self.predict_rows, self.predict_cols])
             pred[pred < 1] = 1
             pred[pred > 4] = 4
-            return np.unique(true), np.unique(pred), sklearn.metrics.confusion_matrix(true, pred)
+            return sklearn.metrics.confusion_matrix(true, pred)
 
 
 def plot_ridge(ridge):

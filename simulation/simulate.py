@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Algorithms for simulating ordinal from continuous data and for simulating a
+missing data mask from an ordinal dataset.
+"""
+
 import numpy as np
 import scipy.sparse
 

@@ -1,5 +1,11 @@
 # Pycache
 **__pycache__/
 
-# ipynb checkpoints
+# Visual Studio Code
+.vscode
+
+# IPython Notebook checkpoints
 **.ipynb_checkpoints
+
+# MacOS .DS_Store
+.DS_Store

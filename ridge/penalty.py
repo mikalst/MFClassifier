@@ -27,8 +27,14 @@ class RidgePenalty:
                 np.arange(self.X.shape[0]), size=int(0.10*self.X.shape[0]), replace=False)
             is_nonzero = self.Xtrain[row_candidates] != 0
             counts_nonzero = np.cumsum(is_nonzero, axis=1)
-            # Find column index of 5th nonzero entry in row
-            col_candidates = np.argmax(counts_nonzero == 5, axis=1)
+            # Choose rth nonzero entry in row randomly in the range
+            # between 5 and half the number of nonzero entries
+            rth_nonzero_predict = np.random.randint(
+                5*np.ones(len(row_candidates)),
+                np.amax((counts_nonzero[:, -1]//2, 6*np.ones(len(row_candidates))), axis=0)
+            )
+            # Find column index of rth nonzero entry in row
+            col_candidates = np.argmax(counts_nonzero == rth_nonzero_predict[:, None], axis=1)
             for i, row in enumerate(row_candidates):
                 if col_candidates[i] - self.predict_window > 5:
                     self.Xtrain[row, col_candidates[i] -
@@ -203,15 +209,15 @@ def plot_ridge(ridge):
 
     np.random.seed(12)
     # Plot predictions for women with cancer
-    fig = plt.figure(figsize=(12, 10))
+    fig = plt.figure(figsize=(12, 20))
 
     X_approx = ridge.U@ridge.V.T
     X_approx_int = np.round(X_approx)
     indices_with_risk = np.argwhere(np.any(ridge.X > 3, axis=1)).flatten()
-    indices = np.random.choice(indices_with_risk, size=16, replace=False)
+    indices = np.random.choice(indices_with_risk, size=32, replace=False)
 
     for number, i in enumerate(indices):
-        plt.subplot(4, 4, number+1)
+        plt.subplot(8, 4, number+1)
         plt.plot(X_approx[i, :])
         plt.plot(X_approx_int[i, :], linestyle='--')
 

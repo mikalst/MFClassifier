@@ -164,6 +164,7 @@ class RidgePenalty:
             pred = np.round((self.U@self.V.T)[self.predict_entries])
             pred[pred < 1] = 1
             pred[pred > 4] = 4
+
             return sklearn.metrics.confusion_matrix(true, pred)
 
         elif self.predict_method == 'realistic':
@@ -172,7 +173,22 @@ class RidgePenalty:
                             self.predict_rows, self.predict_cols])
             pred[pred < 1] = 1
             pred[pred > 4] = 4
+
             return sklearn.metrics.confusion_matrix(true, pred)
+
+    def confusion_matrix_forward_fill(self):
+        try:
+            assert(self.predict_method == 'realistic')
+
+            true = self.X[self.predict_rows, self.predict_cols]
+            last_known = np.empty_like(true)
+            for index, i in enumerate(self.predict_rows):    
+                j = self.Xtrain.shape[1] - 1 - np.argmax(self.Xtrain[i, ::-1] != 0)
+                last_known[index] = self.Xtrain[i, j]
+            return sklearn.metrics.confusion_matrix(true, last_known)
+
+        except AssertionError:
+            print('prediction method should be set to realistic')
 
 
 def plot_ridge(ridge):

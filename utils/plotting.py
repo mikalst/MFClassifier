@@ -97,25 +97,75 @@ def plot_sparsity(matrix1, matrix2):
     plt.show()
 
 
-def plot_visual(matrix1, matrix2, titles=("Synthetic", "Original")):
-    fig = plt.figure(figsize=(14, 6))
+def plot_visual(matrices, vrange=(1, 4), titles=None):
 
-    plt.subplot(1, 2, 1)
-    plt.title(titles[0])
-    if scipy.sparse.issparse(matrix1):
-        out = plt.imshow(matrix1.todense(), aspect="auto")
-    else:
-        out = plt.imshow(matrix1, aspect="auto")
-    out = plt.colorbar()
+    if titles is None:
+        titles = ['matrix' + str(i) for i in range(len(matrices))]
 
-    plt.subplot(1, 2, 2)
-    plt.title(titles[1])
-    if scipy.sparse.issparse(matrix2):
-        out = plt.imshow(matrix2.todense(), aspect="auto")
+    if len(matrices) % 2 == 0:
+        fig, axes = plt.subplots(
+            figsize=(14, 6*(len(matrices)//2)),
+            nrows=len(matrices)//2,
+            ncols=2
+        )
+
+        for i, matrix in enumerate(matrices):
+            if scipy.sparse.issparse(matrix):
+                out = axes[i].imshow(matrix.todense(), aspect="auto",
+                                 vmin=vrange[0], vmax=vrange[1])
+            else:
+                out = axes[i].imshow(matrix, aspect="auto",
+                                 vmin=vrange[0], vmax=vrange[1])
+            axes[i].title.set_text(titles[i])
+            
+
+        fig.subplots_adjust(right=0.85)
+        cbar_ax = fig.add_axes([0.90, 0.15, 0.03, 0.7])
+        fig.colorbar(out, cax=cbar_ax)
+        plt.show()
+
+    elif len(matrices) % 3 == 0:
+        fig, axes = plt.subplots(
+            figsize=(14, 6*(len(matrices)//3)),
+            nrows=len(matrices)//3,
+            ncols=3
+        )
+
+        for i, matrix in enumerate(matrices):
+            if scipy.sparse.issparse(matrix):
+                out = axes[i].imshow(matrix.todense(), aspect="auto",
+                                 vmin=vrange[0], vmax=vrange[1])
+            else:
+                out = axes[i].imshow(matrix, aspect="auto",
+                                 vmin=vrange[0], vmax=vrange[1])
+            axes[i].title.set_text(titles[i])
+            
+
+        fig.subplots_adjust(right=0.85)
+        cbar_ax = fig.add_axes([0.90, 0.15, 0.03, 0.7])
+        fig.colorbar(out, cax=cbar_ax)
+        plt.show()
+
     else:
-        out = plt.imshow(matrix2, aspect="auto")
-    out = plt.colorbar()
-    plt.show()
+        fig, axes = plt.subplots(
+            figsize=(14, 6*(len(matrices)//3 + 1)),
+            nrows=len(matrices)//3 + 1,
+            ncols=3
+        )
+
+        for i, matrix in enumerate(matrices):
+            if scipy.sparse.issparse(matrix):
+                out = axes[i].imshow(matrix.todense(), aspect="auto",
+                                 vmin=vrange[0], vmax=vrange[1])
+            else:
+                out = axes[i].imshow(matrix, aspect="auto",
+                                 vmin=vrange[0], vmax=vrange[1])
+            axes[i].title.set_text(titles[i])
+            
+        fig.subplots_adjust(right=0.85)
+        cbar_ax = fig.add_axes([0.90, 0.15, 0.03, 0.7])
+        fig.colorbar(out, cax=cbar_ax)
+        plt.show()
 
 
 def plot_compare_svd_with_basis(S, path_to_basis):

@@ -68,6 +68,8 @@ class RidgePenalty:
                                             np.random.uniform(size=self.N*self.k))).reshape((self.N, self.k))
         self.S = self.Xtrain.copy()
 
+        self.oldU = np.zeros_like(self.U)
+        self.oldV = np.zeros_like(self.V)
         self.iteration = 0
         self.total_iterations = kwargs['total_iterations']
 
@@ -145,10 +147,19 @@ class RidgePenalty:
         return self
 
     def __next__(self):
+        if self.iteration%50==0:
+            self.oldU = np.copy(self.U)
+            self.oldV = np.copy(self.V)
+            self.solve_inner()
+            self.iteration += 1
+            if (np.linalg.norm(self.oldU@self.oldV.T - self.U@self.V.T) / \
+                np.linalg.norm(self.U@self.V.T) < 1e-3):
+                print('Converged!')
+                return True
+            return False
         self.solve_inner()
         self.iteration += 1
-
-        return self.iteration
+        return False
 
     def select_random_entries(self, percentage):
         nonzero_rows, nonzero_cols = np.nonzero(self.X)

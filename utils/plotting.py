@@ -97,7 +97,7 @@ def plot_sparsity(matrix1, matrix2):
     plt.show()
 
 
-def plot_visual(matrices, vrange=(1, 4), titles=None):
+def plot_visual(matrices, vrange=(1, 4), titles=None, output_file=None):
 
     if titles is None:
         titles = ['matrix' + str(i) for i in range(len(matrices))]
@@ -112,17 +112,15 @@ def plot_visual(matrices, vrange=(1, 4), titles=None):
         for i, matrix in enumerate(matrices):
             if scipy.sparse.issparse(matrix):
                 out = axes[i].imshow(matrix.todense(), aspect="auto",
-                                 vmin=vrange[0], vmax=vrange[1])
+                                     vmin=vrange[0], vmax=vrange[1])
             else:
                 out = axes[i].imshow(matrix, aspect="auto",
-                                 vmin=vrange[0], vmax=vrange[1])
+                                     vmin=vrange[0], vmax=vrange[1])
             axes[i].title.set_text(titles[i])
-            
 
         fig.subplots_adjust(right=0.85)
         cbar_ax = fig.add_axes([0.90, 0.15, 0.03, 0.7])
         fig.colorbar(out, cax=cbar_ax)
-        plt.show()
 
     elif len(matrices) % 3 == 0:
         fig, axes = plt.subplots(
@@ -134,17 +132,15 @@ def plot_visual(matrices, vrange=(1, 4), titles=None):
         for i, matrix in enumerate(matrices):
             if scipy.sparse.issparse(matrix):
                 out = axes[i].imshow(matrix.todense(), aspect="auto",
-                                 vmin=vrange[0], vmax=vrange[1])
+                                     vmin=vrange[0], vmax=vrange[1])
             else:
                 out = axes[i].imshow(matrix, aspect="auto",
-                                 vmin=vrange[0], vmax=vrange[1])
+                                     vmin=vrange[0], vmax=vrange[1])
             axes[i].title.set_text(titles[i])
-            
 
         fig.subplots_adjust(right=0.85)
         cbar_ax = fig.add_axes([0.90, 0.15, 0.03, 0.7])
         fig.colorbar(out, cax=cbar_ax)
-        plt.show()
 
     else:
         fig, axes = plt.subplots(
@@ -156,15 +152,21 @@ def plot_visual(matrices, vrange=(1, 4), titles=None):
         for i, matrix in enumerate(matrices):
             if scipy.sparse.issparse(matrix):
                 out = axes[i].imshow(matrix.todense(), aspect="auto",
-                                 vmin=vrange[0], vmax=vrange[1])
+                                     vmin=vrange[0], vmax=vrange[1])
             else:
                 out = axes[i].imshow(matrix, aspect="auto",
-                                 vmin=vrange[0], vmax=vrange[1])
+                                     vmin=vrange[0], vmax=vrange[1])
             axes[i].title.set_text(titles[i])
-            
+
         fig.subplots_adjust(right=0.85)
         cbar_ax = fig.add_axes([0.90, 0.15, 0.03, 0.7])
         fig.colorbar(out, cax=cbar_ax)
+
+    # Save output
+    if output_file is None:
+        plt.show()
+    else:
+        plt.savefig(output_file)
         plt.show()
 
 

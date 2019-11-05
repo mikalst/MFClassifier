@@ -60,7 +60,8 @@ def simulate_mask(
 def simulate_ordinal_from_float(
     basis, explained_variance_ratios,
     parameters,
-    return_float=False
+    return_float=False,
+    seed=None
 ):
     """Simulation of ordinal data from scores.
 
@@ -80,6 +81,9 @@ def simulate_ordinal_from_float(
     ordinal_domain = parameters['output_domain']
     kernel_parameter = parameters['kernel_parameter']
     truncate_limits = parameters['truncate_limits']
+
+    if not(seed is None):
+        np.random.seed(seed)
 
     weights = np.random.uniform(
         size=(38001, basis.shape[0])) * explained_variance_ratios

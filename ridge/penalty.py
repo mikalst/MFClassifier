@@ -19,7 +19,7 @@ class RidgePenalty:
             self.predict_entries = self.select_random_entries(percentage=0.10)
             self.Xtrain[self.predict_entries] = 0.0
 
-        if kwargs['predict_method'] == 'realistic':
+        elif kwargs['predict_method'] == 'realistic':
             self.predict_window = kwargs['predict_window']
             predict_rows, predict_cols = [], []
 
@@ -28,10 +28,10 @@ class RidgePenalty:
             is_nonzero = self.Xtrain[row_candidates] != 0
             counts_nonzero = np.cumsum(is_nonzero, axis=1)
             # Choose rth nonzero entry in row randomly in the range
-            # between 5 and half the number of nonzero entries
+            # between 5 and
             rth_nonzero_predict = np.random.randint(
                 5*np.ones(len(row_candidates)),
-                np.amax((counts_nonzero[:, -1]//2, 6*np.ones(len(row_candidates))), axis=0)
+                np.amax((3*counts_nonzero[:, -1]//4, 6*np.ones(len(row_candidates))), axis=0)
             )
             # Find column index of rth nonzero entry in row
             col_candidates = np.argmax(counts_nonzero == rth_nonzero_predict[:, None], axis=1)
@@ -44,6 +44,9 @@ class RidgePenalty:
 
             self.predict_rows = np.array(predict_rows)
             self.predict_cols = np.array(predict_cols)
+
+        elif kwargs['predict_method'] == 'no_prediction':
+            pass
 
         print(
             'Assigning {:.2e} / {:.2e} observations to training'.format(
@@ -70,8 +73,10 @@ class RidgePenalty:
 
         self.oldU = np.zeros_like(self.U)
         self.oldV = np.zeros_like(self.V)
+        
         self.iteration = 0
         self.total_iterations = kwargs['total_iterations']
+        self.tol = kwargs['convergence_tol']
 
     def f(self, U, V):
         return self.lambda0 * np.sum(np.power((self.Xtrain - U@V.T)[self.Xtrain != 0], 2)) + \
@@ -153,7 +158,7 @@ class RidgePenalty:
             self.solve_inner()
             self.iteration += 1
             if (np.linalg.norm(self.oldU@self.oldV.T - self.U@self.V.T) / \
-                np.linalg.norm(self.U@self.V.T) < 1e-3):
+                np.linalg.norm(self.U@self.V.T) < self.tol):
                 print('Converged!')
                 return True
             return False

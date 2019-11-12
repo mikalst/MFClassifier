@@ -27,20 +27,30 @@ class RidgePenalty:
                 np.arange(self.X.shape[0]), size=int(0.10*self.X.shape[0]), replace=False)
             is_nonzero = self.Xtrain[row_candidates] != 0
             counts_nonzero = np.cumsum(is_nonzero, axis=1)
-            # Choose rth nonzero entry in row randomly in the range
-            # between 5 and
+
+            # Choose rth nonzero entry in row randomly
             rth_nonzero_predict = np.random.randint(
                 5*np.ones(len(row_candidates)),
-                np.amax((3*counts_nonzero[:, -1]//4, 6*np.ones(len(row_candidates))), axis=0)
+                np.amax((3*counts_nonzero[:, -1]//4, 6 *
+                         np.ones(len(row_candidates))), axis=0)
             )
             # Find column index of rth nonzero entry in row
-            col_candidates = np.argmax(counts_nonzero == rth_nonzero_predict[:, None], axis=1)
-            for i, row in enumerate(row_candidates):
-                if col_candidates[i] - self.predict_window > 5:
-                    self.Xtrain[row, col_candidates[i] -
+            col_candidates = np.argmax(
+                counts_nonzero == rth_nonzero_predict[:, None], axis=1)
+
+            valid_row_candidates = row_candidates[col_candidates > 0]
+            valid_col_candidates = col_candidates[col_candidates > 0]
+
+            for i, row in enumerate(valid_row_candidates):
+                # Check if sufficient amount of nonzero entries
+                row_is_nonzero = self.Xtrain[row, :valid_col_candidates[i] -
+                                             self.predict_window] != 0
+                row_counts_nonzero = np.sum(row_is_nonzero)
+                if (row_counts_nonzero) > 3:
+                    self.Xtrain[row, valid_col_candidates[i] -
                                 self.predict_window:] = 0.0
                     predict_rows.append(row)
-                    predict_cols.append(col_candidates[i])
+                    predict_cols.append(valid_col_candidates[i])
 
             self.predict_rows = np.array(predict_rows)
             self.predict_cols = np.array(predict_cols)
@@ -73,7 +83,7 @@ class RidgePenalty:
 
         self.oldU = np.zeros_like(self.U)
         self.oldV = np.zeros_like(self.V)
-        
+
         self.iteration = 0
         self.total_iterations = kwargs['total_iterations']
         self.tol = kwargs['convergence_tol']
@@ -152,13 +162,13 @@ class RidgePenalty:
         return self
 
     def __next__(self):
-        if self.iteration%50==0:
+        if self.iteration % 50 == 0:
             self.oldU = np.copy(self.U)
             self.oldV = np.copy(self.V)
             self.solve_inner()
             self.iteration += 1
-            if (np.linalg.norm(self.oldU@self.oldV.T - self.U@self.V.T) / \
-                np.linalg.norm(self.U@self.V.T) < self.tol):
+            if (np.linalg.norm(self.oldU@self.oldV.T - self.U@self.V.T) /
+                    np.linalg.norm(self.U@self.V.T) < self.tol):
                 print('Converged!')
                 return True
             return False
@@ -174,10 +184,10 @@ class RidgePenalty:
         )
         return nonzero_rows[random_indices], nonzero_cols[random_indices]
 
-    def confusion_matrix(self):
+    def confusion_matrix(self, offset=0):
         if self.predict_method == 'naive':
             true = self.X[self.predict_entries]
-            pred = np.round((self.U@self.V.T)[self.predict_entries])
+            pred = np.round((self.U@self.V.T)[self.predict_entries] + offset)
             pred[pred < 1] = 1
             pred[pred > 4] = 4
 
@@ -186,7 +196,7 @@ class RidgePenalty:
         elif self.predict_method == 'realistic':
             true = self.X[self.predict_rows, self.predict_cols]
             pred = np.round((self.U@self.V.T)[
-                            self.predict_rows, self.predict_cols])
+                            self.predict_rows, self.predict_cols] + offset)
             pred[pred < 1] = 1
             pred[pred > 4] = 4
 
@@ -198,8 +208,9 @@ class RidgePenalty:
 
             true = self.X[self.predict_rows, self.predict_cols]
             last_known = np.empty_like(true)
-            for index, i in enumerate(self.predict_rows):    
-                j = self.Xtrain.shape[1] - 1 - np.argmax(self.Xtrain[i, ::-1] != 0)
+            for index, i in enumerate(self.predict_rows):
+                j = self.Xtrain.shape[1] - 1 - \
+                    np.argmax(self.Xtrain[i, ::-1] != 0)
                 last_known[index] = self.Xtrain[i, j]
             return sklearn.metrics.confusion_matrix(true, last_known)
 

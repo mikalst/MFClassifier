@@ -58,7 +58,7 @@ def simulate_mask(
 
 
 def simulate_ordinal_from_float(
-    basis, explained_variance_ratios,
+    matrix,
     parameters,
     return_float=False,
     seed=None
@@ -80,19 +80,13 @@ def simulate_ordinal_from_float(
     original_data_pdf = parameters['original_data_pdf']
     ordinal_domain = parameters['output_domain']
     kernel_parameter = parameters['kernel_parameter']
-    truncate_limits = parameters['truncate_limits']
+    try:
+        truncate_limits = parameters['truncate_limits']
+    except KeyError:
+        truncate_limits = [0., 1.]
 
     if not(seed is None):
         np.random.seed(seed)
-
-    weights = np.random.uniform(
-        size=(38001, basis.shape[0])) * explained_variance_ratios
-    # Squares should sum up to 1
-    # / np.reshape(np.sqrt((weights**2).sum(axis=1)), (38001, 1))
-    weights_normalized = weights
-
-    # Generate 38001 rows as random linear combinations of these singular 5 components
-    matrix = weights_normalized@basis
 
     lower_truncate_limit, upper_truncate_limit = np.quantile(
         matrix, truncate_limits)

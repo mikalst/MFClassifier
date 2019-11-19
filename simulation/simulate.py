@@ -97,7 +97,7 @@ def simulate_ordinal_from_float(
     matrix[matrix < domain_min] = domain_min
     matrix[matrix > domain_max] = domain_max
 
-    def distribution(x, dom): return np.exp(-kernel_parameter*np.abs(x - dom))
+    def distribution(x, dom): return np.exp(-kernel_parameter*(x - dom)**2)
     def is_neighbours(x, y): return np.abs(x - y) <= 1
 
     domain_repeated = np.repeat(ordinal_domain, matrix.shape[0]).reshape(

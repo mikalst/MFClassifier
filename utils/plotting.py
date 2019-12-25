@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse
 import sklearn.decomposition
+import copy
 
 # Import local files
 from .stats import distribution_per_age
@@ -97,35 +98,38 @@ def plot_sparsity(matrix1, matrix2):
     plt.show()
 
 
-def plot_visual(matrices, vrange=(1, 4), titles=None, output_file=None, show_missing=False):
+def plot_visual(matrices, vrange=(1, 4), plot_dims=(14, 6), titles=None, output_file=None, show_missing=None):
 
-    if show_missing:
-        my_cmap = plt.cm.get_cmap('viridis')
-        my_cmap.set_under('k', alpha=1.0) # make locations under vmin translucent black 
+    nonmasked_cmap = copy.copy(plt.cm.get_cmap('viridis'))
+    masked_cmap = copy.copy(plt.cm.get_cmap('viridis'))
+    # make locations under vmin translucent black
+    masked_cmap.set_under('k', alpha=1.0)
 
-    else:
-        my_cmap = plt.cm.get_cmap('viridis')
+    if show_missing is None:
+        show_missing = [False]*len(matrices)
+
+    get_cmap = lambda i: masked_cmap if show_missing[i] else nonmasked_cmap
 
     if titles is None:
         titles = ['matrix' + str(i) for i in range(len(matrices))]
 
-    if len(matrices)%2 == 0:
+    if len(matrices) % 2 == 0:
         fig, axes = plt.subplots(
-            figsize=(14, 6*(len(matrices)//2)),
+            figsize=(plot_dims[0], plot_dims[1]*(len(matrices)//2)),
             nrows=len(matrices)//2,
             ncols=2
         )
 
     elif len(matrices) % 3 == 0:
         fig, axes = plt.subplots(
-            figsize=(14, 6*(len(matrices)//3)),
+            figsize=(plot_dims[0], plot_dims[1]*(len(matrices)//3)),
             nrows=len(matrices)//3,
             ncols=3
         )
 
     else:
         fig, axes = plt.subplots(
-            figsize=(14, 6*(len(matrices)//3 + 1)),
+            figsize=(plot_dims[0], plot_dims[1]*(len(matrices)//3 + 1)),
             nrows=len(matrices)//3 + 1,
             ncols=3
         )
@@ -133,15 +137,23 @@ def plot_visual(matrices, vrange=(1, 4), titles=None, output_file=None, show_mis
     for i, ax in enumerate(axes.flat):
         if scipy.sparse.issparse(matrices[i]):
             out = ax.imshow(matrices[i].todense(), aspect="auto",
-                                    vmin=vrange[0], vmax=vrange[1], cmap=my_cmap)
+                            vmin=vrange[0], vmax=vrange[1], cmap=get_cmap(i))
+            ax.set_ylabel("N")
         else:
             out = ax.imshow(matrices[i], aspect="auto",
-                                    vmin=vrange[0], vmax=vrange[1], cmap=my_cmap)
+                            vmin=vrange[0], vmax=vrange[1], cmap=get_cmap(i))
+            ax.set_ylabel("N")
+
+        ax.set_xlabel("T ({})".format(matrices[i].shape[1]))
+        ax.tick_params(axis='both', labelbottom=False, labelleft=False)
+        ax.set_ylabel("N ({})".format(matrices[i].shape[0]))
         ax.title.set_text(titles[i])
 
-    fig.subplots_adjust(right=0.85)
-    cbar_ax = fig.add_axes([0.90, 0.15, 0.03, 0.7])
-    fig.colorbar(out, cax=cbar_ax)
+    fig.subplots_adjust(right=0.88)
+    cbar_ax = fig.add_axes([0.9, 0.13, 0.015, 0.74])
+    fig.colorbar(out, cax=cbar_ax, orientation='vertical')
+
+    plt.subplots_adjust(wspace=0.12, hspace=0.13)
 
     # Save output
     if output_file is None:

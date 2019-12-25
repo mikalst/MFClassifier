@@ -124,7 +124,10 @@ class RidgePenalty:
         self.iteration += 1
         return False
 
-    def calculate_likelihood(self, X_predict, posterior=None):
+    def calculate_likelihood(self, Xp, posterior=None):
+        """
+        For each row d in Xp, calculate the likelihood of d originating from V_l for l = 1, ... k.
+        """
 
         if posterior is None:
             theta = 2.0
@@ -132,15 +135,26 @@ class RidgePenalty:
 
         priors = np.sum(np.abs(self.U), axis=0) / np.sum(np.abs(self.U))
 
-        L = np.ones((X_predict.shape[0], self.k))
+        L = np.ones((Xp.shape[0], self.k))
 
-        for i in range(X_predict.shape[0]):
-            row_nonzero_cols = X_predict[i] != 0
-            inside = (X_predict[i, row_nonzero_cols])[:,None] - self.V[row_nonzero_cols, :]
+        for i in range(Xp.shape[0]):
+            row_nonzero_cols = Xp[i] != 0
+            inside = (Xp[i, row_nonzero_cols])[:,None] - self.V[row_nonzero_cols, :]
             likelihood = np.prod(posterior(inside), axis=0)*priors
             L[i] = likelihood
 
         return L
 
-    def predict(self, X_predict):
-        pass
+    def predict(self, Xp):
+        """
+        Fit prediction on a regressor set Xp. Predictions are chosen as the V_l with the highest likelihood,
+        see calculate_likelihood.
+        """
+        Xp_completed = np.empty_like(Xp)
+
+        L = self.calculate_likelihood(Xp)
+        most_likely_k = np.argmax(L, axis=1)
+
+        Xp_completed = self.V[:, most_likely_k]
+
+        return Xp_completed.T

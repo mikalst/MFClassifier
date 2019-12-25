@@ -77,7 +77,6 @@ def simulate_ordinal_from_float(
     ----------
     res : The resulting matrix of ordinal data.
     """
-    original_data_pdf = parameters['original_data_pdf']
     ordinal_domain = parameters['output_domain']
     kernel_parameter = parameters['kernel_parameter']
     try:
@@ -98,7 +97,7 @@ def simulate_ordinal_from_float(
     matrix[matrix < domain_min] = domain_min
     matrix[matrix > domain_max] = domain_max
 
-    def distribution(x, dom): return np.exp(-kernel_parameter*np.abs(x - dom))
+    def distribution(x, dom): return np.exp(-kernel_parameter*(x - dom)**2)
     def is_neighbours(x, y): return np.abs(x - y) <= 1
 
     domain_repeated = np.repeat(ordinal_domain, matrix.shape[0]).reshape(
@@ -109,7 +108,7 @@ def simulate_ordinal_from_float(
     # Initialization
     column_repeated = np.repeat(matrix[:, 0], 4).reshape(
         (matrix.shape[0], 4), order='C')
-    d = distribution(column_repeated, domain_repeated) * original_data_pdf
+    d = distribution(column_repeated, domain_repeated)
     cdf = np.cumsum(d / np.reshape(np.sum(d, axis=1),
                                    (matrix.shape[0], 1)), axis=1)
 
@@ -124,8 +123,7 @@ def simulate_ordinal_from_float(
         last_int_column_repeated = np.repeat(
             res[:, j-1], 4).reshape((matrix.shape[0], 4), order='C')
         neighbours = is_neighbours(last_int_column_repeated, domain_repeated)
-        d = distribution(column_repeated, domain_repeated) * \
-            neighbours * original_data_pdf
+        d = distribution(column_repeated, domain_repeated) * neighbours
         cdf = np.cumsum(d / np.reshape(np.sum(d, axis=1),
                                        (matrix.shape[0], 1)), axis=1)
 

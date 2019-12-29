@@ -126,21 +126,21 @@ class RidgePenalty:
 
     def calculate_likelihood(self, Xp, posterior=None):
         """
-        For each row d in Xp, calculate the likelihood of d originating from V_l for l = 1, ... k.
+        For each row d in Xp, calculate the likelihood of d originating from M_l for l = 1, ... N_1.
         """
 
         if posterior is None:
-            theta = 2.0
-            posterior = lambda d: np.exp(-theta * np.abs(d))
+            theta = 2.5
+            posterior = lambda d: -theta * d**2
 
-        priors = np.sum(np.abs(self.U), axis=0) / np.sum(np.abs(self.U))
+        trainM = self.U@self.V.T
 
-        L = np.ones((Xp.shape[0], self.k))
+        L = np.ones((Xp.shape[0], trainM.shape[0]))
 
         for i in range(Xp.shape[0]):
             row_nonzero_cols = Xp[i] != 0
-            inside = (Xp[i, row_nonzero_cols])[:,None] - self.V[row_nonzero_cols, :]
-            likelihood = np.prod(posterior(inside), axis=0)*priors
+            inside = (Xp[i, row_nonzero_cols])[None, :] - trainM[:, row_nonzero_cols]
+            likelihood = np.sum(posterior(inside), axis=1)
             L[i] = likelihood
 
         return L

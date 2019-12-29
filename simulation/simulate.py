@@ -6,7 +6,6 @@ missing data mask from an ordinal dataset.
 """
 
 import numpy as np
-import scipy.sparse
 
 
 def simulate_mask(
@@ -57,51 +56,46 @@ def simulate_mask(
     return mask
 
 
-def simulate_ordinal_from_float(
+def simulate_integer_from_float(
     matrix,
     parameters,
     return_float=False,
     seed=None
 ):
-    """Simulation of ordinal data from scores.
+    """Simulation of integer data from floats.
 
     Parameters
     ----------
-    matrix : Scores.
-    pdf : The (approximate) resulting distribution of the ordinal values.
-    ordinal_domain : Possible values of the output.
-    kernel_parameter : The strength with which a score will seek towards the corresponding ordinal value.
-    truncate_limits : Limits for tuning the tails of the resulting distribution.
+    matrix       : Scores.
+    parameters   : Parameters for the simulation.
+        {
+            output_domain    : Subset of the integers included in the output.
+            kernel_parameter : Parameter used in the pmf.
+        }
+    return_float : Return input.
+    seed         : Replication of results.
 
     Returns
     ----------
-    res : The resulting matrix of ordinal data.
+    res : Simulated integer matrix 
     """
-    ordinal_domain = parameters['output_domain']
+    output_domain = parameters['output_domain']
     kernel_parameter = parameters['kernel_parameter']
-    try:
-        truncate_limits = parameters['truncate_limits']
-    except KeyError:
-        truncate_limits = [0., 1.]
 
     if not(seed is None):
         np.random.seed(seed)
 
-    lower_truncate_limit, upper_truncate_limit = np.quantile(
-        matrix, truncate_limits)
-    domain_max = np.max(ordinal_domain)
-    domain_min = np.min(ordinal_domain)
+    domain_max = np.max(output_domain)
+    domain_min = np.min(output_domain)
 
-    matrix = domain_min + (domain_max - domain_min) * (matrix -
-                                                       lower_truncate_limit)/(upper_truncate_limit - lower_truncate_limit)
-    matrix[matrix < domain_min] = domain_min
-    matrix[matrix > domain_max] = domain_max
+    matrix = domain_min + (domain_max - domain_min)*(matrix -
+                                                       np.min(matrix))/(np.max(matrix) - np.min(matrix))
 
     def distribution(x, dom): return np.exp(-kernel_parameter*(x - dom)**2)
     def is_neighbours(x, y): return np.abs(x - y) <= 1
 
-    domain_repeated = np.repeat(ordinal_domain, matrix.shape[0]).reshape(
-        (matrix.shape[0], ordinal_domain.shape[0]), order='F')
+    domain_repeated = np.repeat(output_domain, matrix.shape[0]).reshape(
+        (matrix.shape[0], output_domain.shape[0]), order='F')
 
     res = np.empty_like(matrix)
 
@@ -114,7 +108,7 @@ def simulate_ordinal_from_float(
 
     u = np.random.uniform(size=(matrix.shape[0], 1))
     indices = np.argmax(u <= cdf, axis=1)
-    res[:, 0] = ordinal_domain[indices]
+    res[:, 0] = output_domain[indices]
 
     # Timestepping
     for j in range(1, matrix.shape[1]):
@@ -129,7 +123,7 @@ def simulate_ordinal_from_float(
 
         u = np.random.uniform(size=(matrix.shape[0], 1))
         indices = np.argmax(u <= cdf, axis=1)
-        res[:, j] = ordinal_domain[indices]
+        res[:, j] = output_domain[indices]
 
     if return_float:
         return res, matrix
@@ -172,7 +166,7 @@ def simulate_synthetic(
         parameters=parameters_simulate_mask
     )
 
-    X_synthetic_final = scipy.sparse.csr_matrix(X_synthetic_ordinal*mask)
+    X_synthetic_final = X_synthetic_ordinal*mask
 
     if return_masked & return_float:
         return X_synthetic_final, X_synthetic_ordinal, X_synthethic_float

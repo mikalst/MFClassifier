@@ -124,37 +124,36 @@ class RidgePenalty:
         self.iteration += 1
         return False
 
-    def calculate_likelihood(self, Xp, posterior=None):
+    def calculate_loglikelihood(self, Xp, theta=2.5):
         """
-        For each row d in Xp, calculate the likelihood of d originating from V_l for l = 1, ... k.
+        For each row y in Xp, calculate the loglikelihood of y having
+        originated from M_l for l = 1, ... N_1.
         """
+        logposterior = lambda d: -theta * d**2
 
-        if posterior is None:
-            theta = 2.0
-            posterior = lambda d: np.exp(-theta * np.abs(d))
+        trainM = self.U@self.V.T
 
-        priors = np.sum(np.abs(self.U), axis=0) / np.sum(np.abs(self.U))
-
-        L = np.ones((Xp.shape[0], self.k))
+        logL = np.ones((Xp.shape[0], trainM.shape[0]))
 
         for i in range(Xp.shape[0]):
             row_nonzero_cols = Xp[i] != 0
-            inside = (Xp[i, row_nonzero_cols])[:,None] - self.V[row_nonzero_cols, :]
-            likelihood = np.prod(posterior(inside), axis=0)*priors
-            L[i] = likelihood
+            inside = (Xp[i, row_nonzero_cols])[None, :] - trainM[:, row_nonzero_cols]
+            loglik_i = np.sum(logposterior(inside), axis=1)
+            logL[i] = loglik_i
 
-        return L
+        return logL
 
-    def predict(self, Xp):
+    def predict(self, Xp, t, output_domain=np.arange(1, 5), theta=2.5):
         """
-        Fit prediction on a regressor set Xp. Predictions are chosen as the V_l with the highest likelihood,
-        see calculate_likelihood.
+        For each row y in Xp, predict the most likely integer.
         """
-        Xp_completed = np.empty_like(Xp)
 
-        L = self.calculate_likelihood(Xp)
-        most_likely_k = np.argmax(L, axis=1)
+        logL = self.calculate_loglikelihood(Xp)
 
-        Xp_completed = self.V[:, most_likely_k]
+        trainM = self.U@self.V.T
 
-        return Xp_completed.T
+        # Probability of sampling integer d_t at time t 
+        # for all risk profiles M_{i, :}, i = 1, ..., N_1 in the training data
+        prob_of_z_given_m = np.exp(-theta*(trainM[:, t, None] - output_domain)**2) 
+
+        return np.exp(logL)@prob_of_z_given_m

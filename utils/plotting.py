@@ -98,12 +98,20 @@ def plot_sparsity(matrix1, matrix2):
     plt.show()
 
 
-def plot_visual(matrices, vrange=(1, 4), plot_dims=(14, 6), titles=None, output_file=None, show_missing=None):
+def plot_visual(
+        matrices, 
+        vrange=(1, 4),
+        plot_dims=(14, 6),
+        titles=None,
+        output_file=None,
+        show_missing=None,
+        cmap=plt.get_cmap('viridis')
+    ):
 
-    nonmasked_cmap = copy.copy(plt.cm.get_cmap('viridis'))
-    masked_cmap = copy.copy(plt.cm.get_cmap('viridis'))
+    nonmasked_cmap = copy.copy(cmap)
+    masked_cmap = copy.copy(cmap)
     # make locations under vmin translucent black
-    masked_cmap.set_under('k', alpha=1.0)
+    masked_cmap.set_under('white', alpha=0.8)
 
     if show_missing is None:
         show_missing = [False]*len(matrices)
@@ -136,14 +144,14 @@ def plot_visual(matrices, vrange=(1, 4), plot_dims=(14, 6), titles=None, output_
 
     for i, ax in enumerate(axes.flat):
         if scipy.sparse.issparse(matrices[i]):
-            out = ax.imshow(matrices[i].todense(), aspect="auto",
-                            vmin=vrange[0], vmax=vrange[1], cmap=get_cmap(i))
-            ax.set_ylabel("N")
+            matrix = matrices[i][np.linspace(0, matrices[i].shape[0]-1, 200, dtype=np.int)].todense()
         else:
-            out = ax.imshow(matrices[i], aspect="auto",
-                            vmin=vrange[0], vmax=vrange[1], cmap=get_cmap(i))
-            ax.set_ylabel("N")
+            matrix = matrices[i][np.linspace(0, matrices[i].shape[0]-1, 200, dtype=np.int)]
 
+        out = ax.imshow(matrix, aspect="auto", 
+                        vmin=vrange[0], vmax=vrange[1], cmap=get_cmap(i))
+
+        ax.set_ylabel("N")
         ax.set_xlabel("T ({})".format(matrices[i].shape[1]))
         ax.tick_params(axis='both', labelbottom=False, labelleft=False)
         ax.set_ylabel("N ({})".format(matrices[i].shape[0]))
@@ -153,7 +161,7 @@ def plot_visual(matrices, vrange=(1, 4), plot_dims=(14, 6), titles=None, output_
     cbar_ax = fig.add_axes([0.9, 0.13, 0.015, 0.74])
     fig.colorbar(out, cax=cbar_ax, orientation='vertical')
 
-    plt.subplots_adjust(wspace=0.12, hspace=0.13)
+    plt.subplots_adjust(wspace=0.12, hspace=0.10)
 
     # Save output
     if output_file is None:

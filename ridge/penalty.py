@@ -142,7 +142,6 @@ class MatrixFactorization:
                 / np.linalg.norm(self.U @ self.V.T)
                 < self.tol
             ):
-                print("Converged!")
                 return True
             return False
         self.solve_inner()

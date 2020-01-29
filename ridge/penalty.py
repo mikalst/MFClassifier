@@ -141,7 +141,7 @@ class MatrixFactorization:
                 np.linalg.norm(self.oldU @ self.oldV.T - self.U @ self.V.T)
                 / np.linalg.norm(self.U @ self.V.T)
                 < self.tol
-            ):
+            ) or self.iteration > self.total_iterations:
                 return True
             return False
         self.solve_inner()

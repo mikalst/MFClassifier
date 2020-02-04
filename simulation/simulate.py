@@ -77,7 +77,8 @@ def simulate_integer_from_float(
 
 def simulate_mask(
     X_integer,
-    mask_parameters
+    mask_parameters,
+    path_dropout=None
 ):
     """Simulation of a missing data mask.
 
@@ -123,13 +124,22 @@ def simulate_mask(
         mask[r <= p, t+1] = True
         observed_values[r <= p, t+1] = X_integer[r <= p, t+1]
 
-    return mask
+    # Simulate dropout
+    if not(path_dropout is None):
+        prob_dropout = np.load(path_dropout)
+        tpoints = np.arange(X_integer.shape[1])
 
+        for num in range(X_integer.shape[0]):
+            t_max = np.random.choice(tpoints, p=prob_dropout, replace=True)
+            mask[num, t_max:] = 0
+
+    return mask
 
 def simulate_synthetic(
     X_float_unscaled,
     integer_parameters,
     mask_parameters,
+    path_dropout=None,
     seed=None
 ):
     """Simulation of a complete synthetic dataset.
@@ -150,7 +160,33 @@ def simulate_synthetic(
 
     mask = simulate_mask(
         X_integer,
-        mask_parameters=mask_parameters
+        mask_parameters=mask_parameters,
+        path_dropout=path_dropout
     )
 
     return X_integer*mask
+
+def summary(
+    X,
+    thresh=2
+):
+    """Summarize the produced synthetic dataset"""
+    
+    print('Density:', np.count_nonzero(X) / X.size * 100, '%')
+
+    I = np.where(np.sum(X, axis=1) != 0)
+    Xnz = X[np.unique(I)]
+
+    vls, cnts = np.unique(Xnz[Xnz != 0], return_counts=True)   
+    print('Unique values:', vls)
+    print('Count:', cnts)
+    print('Prcnt:', cnts / sum(cnts) * 100)
+    print('Num positives: {} Num negatives: {}'.format(np.sum(Xnz > thresh), np.sum(Xnz <= thresh)))
+        
+    # Several test rows will all zeros.
+    nz_rows = np.sum(X != 0, axis=1)
+    print('Min trajectory nz count:', min(nz_rows))
+    print('Max trajectory nz count:', max(nz_rows))
+
+    v, c = np.unique(np.argmax(Xnz != 0, axis=1), return_counts=True) 
+    print('Start indices of test sequences:\n', v)

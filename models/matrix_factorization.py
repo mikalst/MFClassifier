@@ -151,13 +151,13 @@ class MatrixFactorization:
         return np.exp(logL) @ p_of_z_given_m
 
 
-class MatrixFactorizationFull(MatrixFactorization):
+class MatrixFactorizationTesting(MatrixFactorization):
     """An extension of the MatrixFactorization class. Used for testing.
     """
 
     def f(self, U, V):
         return (
-            self.lambda0 * np.sum(np.power((self.X - U @ V.T)[self.X != 0], 2))
+            self.lambda0 * np.sum(np.power((self.Y - U @ V.T)[self.Y != 0], 2))
             + self.lambda1 * np.linalg.norm(U) ** 2
             + self.lambda2 * np.linalg.norm(V - self.J) ** 2
             + self.lambda3 * np.linalg.norm(self.C @ self.R @ V) ** 2
@@ -196,3 +196,44 @@ class MatrixFactorizationFull(MatrixFactorization):
         res3 = 2 * self.lambda3 * (CR).T @ ((CR) @ V)
 
         return (res1 + res2 + res3).reshape(self.T * self.K)
+
+
+class MatrixFactorizationWeighted(MatrixFactorization):
+    """Instead solves the inverse problem
+    || (S - U V^T)W^T ||_F^2 + l1 || U ||_F^2 + l2 || V ||_F^2 + l3 || C R V||_F^2
+    This class is far slower, around 6-7 times the running time.
+    """
+    
+    def __init__(self, args):
+        super(MatrixFactorizationWeighted, self).__init__(args)
+        self.W = args["W"]
+
+    def solve1(self):
+        U = (
+            np.linalg.solve(
+                self.V.T@self.W.T@self.W@self.V +
+                (self.lambda1 / self.lambda0) * np.identity(self.K),
+                self.V.T @ self.W.T @ self.W @ self.S.T,
+            )
+        ).T
+
+        return U
+
+    def solve2(self):
+
+        A = self.W.T@self.W
+        B = self.U.T@self.U
+
+        P0 = np.kron(A, B)
+        P1 = np.kron(self.lambda2*np.identity(self.T), np.identity(self.K))
+        P2 = np.kron(self.lambda3*self.R.T @ self.C.T @ self.C @ self.R, np.identity(self.K))
+
+        V = (np.linalg.solve((P0 + P1 + P2), (self.W.T @ self.W @ self.S.T @ self.U).flatten())).reshape(self.T, self.K)
+
+        return V
+
+    def solve_inner(self):
+        self.U = self.solve1()
+        self.V = self.solve2()
+        self.S = self.solve3()
+        return

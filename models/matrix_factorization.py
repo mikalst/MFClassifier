@@ -110,14 +110,10 @@ class MatrixFactorization:
         self.iteration += 1
         return False
 
-    def calculate_loglikelihood(self, Y_pred, theta_estimate):
+    def loglikelihood(self, Y_pred, theta_estimate):
         """For each row y in Y_pred, calculate the loglikelihood of y having originated
         from the reconstructed continuous profile of all the patients in the training set.
         """
-
-        def loglikelihood_func(eta):
-            return -theta_estimate * eta ** 2
-
         M_train = self.U @ self.V.T
 
         N_1 = M_train.shape[0]
@@ -127,28 +123,22 @@ class MatrixFactorization:
 
         for i in range(N_2):
             row_nonzero_cols = Y_pred[i] != 0
-            linear_predictors = (Y_pred[i, row_nonzero_cols])[None, :] - M_train[
+            eta_i = (Y_pred[i, row_nonzero_cols])[None, :] - M_train[
                 :, row_nonzero_cols
             ]
-            logL[i] = np.sum(loglikelihood_func(linear_predictors), axis=1)
+            logL[i] = np.sum(-theta_estimate*eta_i**2, axis=1)
 
         return logL
 
-    def predict(self, Y_pred, t, output_domain, theta_estimate):
+    def posterior(self, Y_pred, t, output_domain, theta_estimate):
         """For each row y in Y_pred, calculate the most likely integer value for a future
         fixed time t.
         """
-
-        def distribution_z(eta):
-            return np.exp(-theta_estimate * eta ** 2)
-
-        logL = self.calculate_loglikelihood(Y_pred, theta_estimate)
+        logL = self.loglikelihood(Y_pred, theta_estimate)
 
         trainM = self.U @ self.V.T
 
-        p_of_z_given_m = distribution_z(trainM[:, t, None] - output_domain)
-
-        return np.exp(logL) @ p_of_z_given_m
+        return np.exp(logL) @ np.exp(-theta_estimate*(trainM[:, t, None] - output_domain)**2)
 
 
 class MatrixFactorizationTesting(MatrixFactorization):

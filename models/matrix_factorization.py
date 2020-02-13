@@ -47,7 +47,8 @@ class MatrixFactorization:
         # Code optimization purposes
         # Static variables are computed and stored
         self.RTCTCR = (self.C @ self.R).T@(self.C@self.R)
-        self.L2, self.Q2 = np.linalg.eigh((self.lambda3 / self.lambda0) * self.RTCTCR)
+        self.L2, self.Q2 = np.linalg.eigh(
+            (self.lambda3 / self.lambda0) * self.RTCTCR)
 
     def solve1(self):
         U = (
@@ -110,6 +111,12 @@ class MatrixFactorization:
         self.iteration += 1
         return False
 
+    def train(self):
+        while True:
+            converged = next(self)
+            if converged:
+                break
+
     def loglikelihood(self, Y_pred, theta_estimate):
         """For each row y in Y_pred, calculate the loglikelihood of y having originated
         from the reconstructed continuous profile of all the patients in the training set.
@@ -131,14 +138,23 @@ class MatrixFactorization:
         return logL
 
     def posterior(self, Y_pred, t, output_domain, theta_estimate):
-        """For each row y in Y_pred, calculate the most likely integer value for a future
+        """For each row y in Y_pred, calculate the posterior probability
+        of each integer value in the output domain for a future
         fixed time t.
         """
         logL = self.loglikelihood(Y_pred, theta_estimate)
-
         trainM = self.U @ self.V.T
 
         return np.exp(logL) @ np.exp(-theta_estimate*(trainM[:, t, None] - output_domain)**2)
+
+    def predict(self, Y_pred, t, output_domain, theta_estimate):
+        """For each row y in Y_pred, calculate the highest posterior
+        probability integer value in the output domain for a future
+        fixed time t.
+        """
+        p = self.posterior(Y_pred, t, output_domain, theta_estimate)
+        
+        return output_domain[np.argmax(p, axis=1)]
 
 
 class MatrixFactorizationTesting(MatrixFactorization):
@@ -185,7 +201,7 @@ class MatrixFactorizationWeighted(MatrixFactorization):
     || (S - U V^T)W^T ||_F^2 + l1 || U ||_F^2 + l2 || V ||_F^2 + l3 || C R V||_F^2
     This class is far slower, around 6-7 times the running time.
     """
-    
+
     def __init__(self, args):
         super(MatrixFactorizationWeighted, self).__init__(args)
         self.W = args["W"]
@@ -208,9 +224,11 @@ class MatrixFactorizationWeighted(MatrixFactorization):
 
         P0 = np.kron(A, B)
         P1 = np.kron(self.lambda2*np.identity(self.T), np.identity(self.K))
-        P2 = np.kron(self.lambda3*self.R.T @ self.C.T @ self.C @ self.R, np.identity(self.K))
+        P2 = np.kron(self.lambda3*self.R.T @ self.C.T @
+                     self.C @ self.R, np.identity(self.K))
 
-        V = (np.linalg.solve((P0 + P1 + P2), (self.W.T @ self.W @ self.S.T @ self.U).flatten())).reshape(self.T, self.K)
+        V = (np.linalg.solve((P0 + P1 + P2), (self.W.T @ self.W @
+                                              self.S.T @ self.U).flatten())).reshape(self.T, self.K)
 
         return V
 

@@ -145,6 +145,9 @@ class MatrixFactorization:
         logL = self.loglikelihood(Y_pred, theta_estimate)
         trainM = self.U @ self.V.T
 
+        # Ensure that output_domain can be properly indexed.
+        output_domain = np.array(output_domain)
+
         return np.exp(logL) @ np.exp(-theta_estimate*(trainM[:, t, None] - output_domain)**2)
 
     def predict(self, Y_pred, t, output_domain, theta_estimate):
@@ -153,6 +156,9 @@ class MatrixFactorization:
         fixed time t.
         """
         p = self.posterior(Y_pred, t, output_domain, theta_estimate)
+
+        # Ensure that output_domain can be properly indexed.
+        output_domain = np.array(output_domain)
         
         return output_domain[np.argmax(p, axis=1)]
 

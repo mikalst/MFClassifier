@@ -4,7 +4,7 @@ import sklearn.metrics
 
 
 class MatrixFactorization:
-    """A class for solving the inverse problem
+    r"""A class for solving the inverse problem
     || S - U V^T ||_F^2 + l1 || U ||_F^2 + l2 || V ||_F^2 + l3 || C R V||_F^2
     subject to
     P_{\Omega}(S) = P_{\Omega}(Y)

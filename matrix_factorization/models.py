@@ -135,20 +135,7 @@ class MatrixFactorization:
 
         return logL
 
-    # def posterior_old(self, Y_pred, t, output_domain, theta_estimate):
-    #     """For each row y in Y_pred, calculate the posterior probability
-    #     of each integer value in the output domain for a future
-    #     fixed time t.
-    #     """
-    #     logL = self.loglikelihood(Y_pred, theta_estimate)
-    #     trainM = self.U @ self.V.T
-
-    #     # Ensure that output_domain can be properly indexed.
-    #     output_domain = np.array(output_domain)
-
-    #     return np.exp(logL) @ np.exp(-theta_estimate*(trainM[:, t, None] - output_domain)**2)
-
-    def posterior(self, Y_pred, t, output_domain, theta_estimate):
+    def posterior(self, Y_pred, t, domain, theta_estimate):
         """For each row y in Y_pred, calculate the posterior probability
         of each integer value in the output domain for a future
         time t.
@@ -156,19 +143,19 @@ class MatrixFactorization:
         logL = self.loglikelihood(Y_pred, theta_estimate)
         trainM = self.U @ self.V.T
 
-        # Ensure that output_domain can be properly indexed.
-        output_domain = np.array(output_domain)
+        # Ensure that can be properly indexed.
+        domain = np.array(domain)
 
-        p_post = np.empty((Y_pred.shape[0], output_domain.shape[0]))
+        p_post = np.empty((Y_pred.shape[0], domain.shape[0]))
 
         for i in range(Y_pred.shape[0]):
-            p_post[i] = np.exp(logL[i]) @ np.exp(-theta_estimate*(trainM[:, t[i], None] - output_domain)**2)
+            p_post[i] = np.exp(logL[i]) @ np.exp(-theta_estimate*(trainM[:, t[i], None] - domain)**2)
 
         return p_post
 
         #return np.exp(logL) @ np.exp(-theta_estimate*(trainM[:, t, None] - output_domain)**2)
 
-    def predict(self, Y_pred, t, output_domain, theta_estimate):
+    def predict_maxposterior(self, Y_pred, t, output_domain, theta_estimate):
         """For each row y in Y_pred, calculate the highest posterior
         probability integer value in the output domain for a future
         fixed time t.

@@ -135,7 +135,7 @@ class MatrixFactorization:
 
         return logL
 
-    def posterior(self, Y_pred, t, domain, theta_estimate):
+    def posterior(self, Y_pred, t, domain_z, theta_estimate):
         r"""For each row y in Y_pred, calculate the posterior probability
         of each integer value in the output domain for a future
         time t.
@@ -143,58 +143,67 @@ class MatrixFactorization:
         logL = self.loglikelihood(Y_pred, theta_estimate)
         trainM = self.U @ self.V.T
 
-        # Ensure that can be properly indexed.
-        domain = np.array(domain)
-
-        p_z = np.empty((Y_pred.shape[0], domain.shape[0]))
+        p_z = np.empty((Y_pred.shape[0], domain_z.shape[0]))
 
         for i in range(Y_pred.shape[0]):
             p_z[i] = np.exp(logL[i]) @ np.exp(-theta_estimate *
-                                              (trainM[:, t[i], None] - domain)**2)
+                                              (trainM[:, t[i], None] - domain_z)**2)
 
         # Normalize
         p_z_normalized = p_z / (np.sum(p_z, axis=1))[:, None]
 
         return p_z_normalized
 
-    def posterior_rulebased(self, Y_pred, t, domain, theta_estimate, rule, rule_outcomes):
+    def posterior_rulebased(self, Y_pred, t, domain_z, theta_estimate, rule_z_to_e, domain_e, p_z_precomputed=None):
         r"""For each row y in Y_pred, calculate the posterior probability
         of each rule outcome e by mapping rule over the integer values in the
         domain and summing over all integer that result in rule outcome e.
         """
-        p_z = self.posterior(Y_pred, t, domain, theta_estimate)
+        if p_z_precomputed is None:
+            p_z = self.posterior(Y_pred, t, domain_z, theta_estimate)
+        else:
+            p_z = p_z_precomputed
 
-        p_e = np.empty((Y_pred.shape[0], rule_outcomes.shape[0]))
+        p_e = np.empty((Y_pred.shape[0], domain_e.shape[0]))
 
-        for i_event, e in enumerate(rule_outcomes):
+        for i_event, e in enumerate(domain_e):
 
             values_of_z_where_e_happens = np.argwhere(
-                [rule(z) for z in domain] == e)
+                [rule_z_to_e(z) for z in domain_z] == e)
 
             p_e[:, i_event] = (
                 np.sum(p_z[:, values_of_z_where_e_happens], axis=1)).flatten()
 
         return p_e
 
-    def predict(self, Y_pred, t, output_domain, theta_estimate):
+    def predict(self, Y_pred, t, domain_z, theta_estimate, bias_z=None, p_z_precomputed=None):
         r"""For each row y in Y_pred, calculate the highest posterior
         probability integer value for a future time t.
         """
-        p_z = self.posterior(Y_pred, t, output_domain, theta_estimate)
+        if p_z_precomputed is None:
+            p_z = self.posterior(Y_pred, t, domain_z, theta_estimate)
+        else:
+            p_z = p_z_precomputed
 
-        # Ensure that output_domain can be properly indexed.
-        output_domain = np.array(output_domain)
+        if bias_z is None:
+            return domain_z[np.argmax(p_z, axis=1)]
+        else:
+            return domain_z[np.argmax(p_z*bias_z, axis=1)]
 
-        return output_domain[np.argmax(p_z, axis=1)]
-
-    def predict_rulebased(self, Y_pred, t, output_domain, theta_estimate, rule, rule_outcomes, rule_bias):
+    def predict_rulebased(self, Y_pred, t, domain_z, theta_estimate, rule_z_to_e, domain_e, bias_e, p_e_precomputed=None):
         r"""For each row y in Y_pred, calculate the highest posterior
         probability rule outcome e for a future time t.
         """
-        p_e = self.posterior_rulebased(
-            Y_pred, t, output_domain, theta_estimate, rule, rule_outcomes)
+        if p_e_precomputed is None:
+            p_e = self.posterior_rulebased(
+                Y_pred, t, domain_z, theta_estimate, rule_z_to_e, domain_e)
+        else:
+            p_e = p_e_precomputed
 
-        return rule_outcomes[np.argmax(p_e*rule_bias, axis=1)]
+        if bias_e is None:
+            return domain_e[np.argmax(p_e, axis=1)]
+        else:
+            return domain_e[np.argmax(p_e*bias_e, axis=1)]
 
 
 class MatrixFactorizationTesting(MatrixFactorization):

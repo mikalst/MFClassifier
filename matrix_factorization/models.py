@@ -116,7 +116,7 @@ class MatrixFactorization:
                 break
 
     def loglikelihood(self, Y_pred, theta_estimate):
-        """For each row y in Y_pred, calculate the loglikelihood of y having originated
+        r"""For each row y in Y_pred, calculate the loglikelihood of y having originated
         from the reconstructed continuous profile of all the patients in the training set.
         """
         M_train = self.U @ self.V.T
@@ -136,7 +136,7 @@ class MatrixFactorization:
         return logL
 
     def posterior(self, Y_pred, t, domain, theta_estimate):
-        """For each row y in Y_pred, calculate the posterior probability
+        r"""For each row y in Y_pred, calculate the posterior probability
         of each integer value in the output domain for a future
         time t.
         """
@@ -146,45 +146,55 @@ class MatrixFactorization:
         # Ensure that can be properly indexed.
         domain = np.array(domain)
 
-        p_post = np.empty((Y_pred.shape[0], domain.shape[0]))
+        p_z = np.empty((Y_pred.shape[0], domain.shape[0]))
 
         for i in range(Y_pred.shape[0]):
-            p_post[i] = np.exp(logL[i]) @ np.exp(-theta_estimate*(trainM[:, t[i], None] - domain)**2)
+            p_z[i] = np.exp(logL[i]) @ np.exp(-theta_estimate *
+                                              (trainM[:, t[i], None] - domain)**2)
 
         # Normalize
-        p_post_norm = p_post / (np.sum(p_post, axis=1))[:, None]
+        p_z_normalized = p_z / (np.sum(p_z, axis=1))[:, None]
 
-        return p_post_norm
+        return p_z_normalized
 
-
-    def predict_maxposterior(self, Y_pred, t, output_domain, theta_estimate):
-        """For each row y in Y_pred, calculate the highest posterior
-        probability integer value in the output domain for a future
-        fixed time t.
+    def posterior_rulebased(self, Y_pred, t, domain, theta_estimate, rule, rule_outcomes):
+        r"""For each row y in Y_pred, calculate the posterior probability
+        of each rule outcome e by mapping rule over the integer values in the
+        domain and summing over all integer that result in rule outcome e.
         """
-        p = self.posterior(Y_pred, t, output_domain, theta_estimate)
+        p_z = self.posterior(Y_pred, t, domain, theta_estimate)
+
+        p_e = np.empty((Y_pred.shape[0], rule_outcomes.shape[0]))
+
+        for i_event, e in enumerate(rule_outcomes):
+
+            values_of_z_where_e_happens = np.argwhere(
+                [rule(z) for z in domain] == e)
+
+            p_e[:, i_event] = (
+                np.sum(p_z[:, values_of_z_where_e_happens], axis=1)).flatten()
+
+        return p_e
+
+    def predict(self, Y_pred, t, output_domain, theta_estimate):
+        r"""For each row y in Y_pred, calculate the highest posterior
+        probability integer value for a future time t.
+        """
+        p_z = self.posterior(Y_pred, t, output_domain, theta_estimate)
 
         # Ensure that output_domain can be properly indexed.
         output_domain = np.array(output_domain)
-        
-        return output_domain[np.argmax(p, axis=1)]
+
+        return output_domain[np.argmax(p_z, axis=1)]
 
     def predict_rulebased(self, Y_pred, t, output_domain, theta_estimate, rule, rule_outcomes, rule_bias):
-        """For each row y in Y_pred, calculate most probable rule outcome by
-        mapping rule over integer values in the output domain and weighting 
-        the outcomes by the integer value probability. For a fixed time t.
+        r"""For each row y in Y_pred, calculate the highest posterior
+        probability rule outcome e for a future time t.
         """
-        p = self.posterior(Y_pred, t, output_domain, theta_estimate)
+        p_e = self.posterior_rulebased(
+            Y_pred, t, output_domain, theta_estimate, rule, rule_outcomes)
 
-        p_outcomes = np.empty((Y_pred.shape[0], rule_outcomes.shape[0]))
-
-        for i_outcome, outcome in enumerate(rule_outcomes):
-
-            columns_output_domain = np.argwhere([rule(z) for z in output_domain] == outcome)
-
-            p_outcomes[:, i_outcome] = (np.sum(p[:, columns_output_domain], axis=1)).flatten()
-
-        return rule_outcomes[np.argmax(p_outcomes*rule_bias, axis=1)]
+        return rule_outcomes[np.argmax(p_e*rule_bias, axis=1)]
 
 
 class MatrixFactorizationTesting(MatrixFactorization):

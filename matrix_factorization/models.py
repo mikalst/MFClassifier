@@ -190,13 +190,13 @@ class MatrixFactorization:
         else:
             return domain_z[np.argmax(p_z*bias_z, axis=1)]
 
-    def predict_rulebased(self, Y_pred, t, domain_z, theta_estimate, rule_z_to_e, domain_e, bias_e, p_e_precomputed=None):
+    def predict_rulebased(self, Y_pred, t, domain_z, theta_estimate, rule_z_to_e, domain_e, p_z_precomputed=None, bias_e=None, p_e_precomputed=None):
         r"""For each row y in Y_pred, calculate the highest posterior
         probability rule outcome e for a future time t.
         """
         if p_e_precomputed is None:
             p_e = self.posterior_rulebased(
-                Y_pred, t, domain_z, theta_estimate, rule_z_to_e, domain_e)
+                Y_pred, t, domain_z, theta_estimate, rule_z_to_e, domain_e, p_z_precomputed)
         else:
             p_e = p_e_precomputed
 

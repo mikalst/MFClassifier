@@ -1,11 +1,26 @@
+# Data
+data/
+
+# Large result files
+results/
+
+# Figures
+figures/
+
+# Notebooks
+notebooks/
+
 # Pycache
 **__pycache__/
 
 # Visual Studio Code
-.vscode
+**.vscode
 
 # IPython Notebook checkpoints
 **.ipynb_checkpoints
 
 # MacOS .DS_Store
-.DS_Store
+**.DS_Store
+
+# Weird file the keeps popping up
+nohup.out

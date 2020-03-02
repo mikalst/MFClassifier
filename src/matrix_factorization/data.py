@@ -36,17 +36,14 @@ class TemporalDataPrediction(TemporalData):
 
         # Remove all rows that don't satisfy the specified criteria
         self.X = self.X[valid_rows]
-
-        # The times of last observed entry must be computed anew
-        self.time_of_prediction = self.X.shape[1] - np.argmax(
-            self.X[:, ::-1] != 0, axis=1) - 1
+        self.time_of_prediction = time_of_prediction[valid_rows]
 
         # Copy values to be predicted
-        self.y = np.copy(self.X[range(self.X.shape[0]), time_of_prediction])
+        self.y = np.copy(self.X[range(self.X.shape[0]), self.time_of_prediction])
 
         # Overwrite value to be predicted and future values in the regressor dataset
         for i_row in range(self.X.shape[0]):
-            self.X[i_row, time_of_prediction[i_row]:] = 0
+            self.X[i_row, self.time_of_prediction[i_row]:] = 0
 
 
 class TemporalDataKFold(TemporalData):
@@ -58,6 +55,9 @@ class TemporalDataKFold(TemporalData):
 
         kf = sklearn.model_selection.KFold(n_splits, shuffle=False)
         self.fold_indices = [idc for idc in kf.split(self.X)]
+
+    def get_fold_idc(self, k):
+        return self.fold_indices[k]
 
     def get_fold(self, k):
         train_indices, pred_indices = self.fold_indices[k]

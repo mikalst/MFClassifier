@@ -1,6 +1,5 @@
 import sys
 import time
-import argparse
 import numpy as np
 import scipy as sp
 import sklearn.metrics
@@ -142,11 +141,13 @@ def main(
                 pbar.update()
 
     with h5py.File(
-        path_to_project_root+"/results/experiments_synthetic_data/"+"run"+str(int(time.time() // 1))+".hdf5", "w"
+        path_to_project_root+"results/experiments_synthetic_data/"+"run"+str(int(time.time() // 1))+".hdf5", "w"
     ) as outfile:
         outfile.create_dataset("sensitivity_binary", data=sensitivity_with_bias)
         outfile.create_dataset("specificity_binary", data=specificity_with_bias)
         outfile.create_dataset("confusion_matrices", data=cms)
+        outfile.create_dataset("recMSE", data=recMSE)
+        outfile.create_dataset("predSSE", data=predSSE)
 
         outfile.attrs['K_UPPER_RANK_ESTIMATE']=K_UPPER_RANK_EST
         outfile.attrs['THETA_EST']=THETA_EST

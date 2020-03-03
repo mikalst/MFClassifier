@@ -53,6 +53,8 @@ class TemporalDataKFold(TemporalData):
         self.prediction_rule = prediction_rule
         self.prediction_window = prediction_window
 
+        self.pred_obj = TemporalDataPrediction(data=self.X, prediction_rule=self.prediction_rule, prediction_window=self.prediction_window)
+
         kf = sklearn.model_selection.KFold(n_splits, shuffle=False)
         self.fold_indices = [idc for idc in kf.split(self.X)]
 
@@ -62,7 +64,4 @@ class TemporalDataKFold(TemporalData):
     def get_fold(self, k):
         train_indices, pred_indices = self.fold_indices[k]
 
-        train_obj = TemporalData(data=self.X[train_indices])
-        pred_obj = TemporalDataPrediction(data=self.X[pred_indices], prediction_rule=self.prediction_rule, prediction_window=self.prediction_window)
-
-        return train_obj.X, pred_obj.X, pred_obj.y, pred_obj.time_of_prediction
+        return self.X[train_indices], self.pred_obj.X[pred_indices], self.pred_obj.y[pred_indices], self.pred_obj.time_of_prediction[pred_indices]

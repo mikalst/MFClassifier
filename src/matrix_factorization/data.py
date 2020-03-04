@@ -65,7 +65,7 @@ class TemporalDataKFold(TemporalData):
 
         self.X_train = self.train_obj.X[self.train_idc]
         self.X_pred_regressor = self.pred_obj.X[self.pred_idc]
-        self.y = self.pred_obj.y[self.pred_idc]
+        self.y_pred = self.pred_obj.y[self.pred_idc]
         self.time_of_prediction = self.pred_obj.time_of_prediction[self.pred_idc]
 
     def select_fold(self, i_fold):
@@ -75,7 +75,7 @@ class TemporalDataKFold(TemporalData):
 
         self.X_train = self.train_obj.X[self.train_idc]
         self.X_pred_regressor = self.pred_obj.X[self.pred_idc]
-        self.y = self.pred_obj.y[self.pred_idc]
+        self.y_pred = self.pred_obj.y[self.pred_idc]
         self.time_of_prediction = self.pred_obj.time_of_prediction[self.pred_idc]
 
     def get_fold_idc(self):

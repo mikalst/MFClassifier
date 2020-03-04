@@ -24,6 +24,8 @@ class MatrixFactorization:
         self.C = args["C"]  # Convolution
 
         self.K = args["K"]  # Rank
+        self.domain_z = args["domain_z"] # Domain of integer values
+        self.theta_estimate = args["theta_estimate"] # Parameter in the gaussian kernel
 
         self.nonzero_rows, self.nonzero_cols = np.nonzero(self.Y)
         self.N = self.Y.shape[0]
@@ -115,7 +117,7 @@ class MatrixFactorization:
             if converged:
                 break
 
-    def loglikelihood(self, Y_pred, theta_estimate):
+    def loglikelihood(self, Y_pred):
         r"""For each row y in Y_pred, calculate the loglikelihood of y having originated
         from the reconstructed continuous profile of all the patients in the training set.
         """
@@ -131,36 +133,36 @@ class MatrixFactorization:
             eta_i = (Y_pred[i, row_nonzero_cols])[None, :] - M_train[
                 :, row_nonzero_cols
             ]
-            logL[i] = np.sum(-theta_estimate*np.power(eta_i, 2), axis=1)
+            logL[i] = np.sum(-self.theta_estimate*np.power(eta_i, 2), axis=1)
 
         return logL
 
-    def posterior(self, Y_pred, t, domain_z, theta_estimate):
+    def posterior(self, Y_pred, t):
         r"""For each row y in Y_pred, calculate the posterior probability
         of each integer value in the output domain for a future
         time t.
         """
-        logL = self.loglikelihood(Y_pred, theta_estimate)
+        logL = self.loglikelihood(Y_pred)
         trainM = self.U @ self.V.T
 
-        p_z = np.empty((Y_pred.shape[0], domain_z.shape[0]))
+        p_z = np.empty((Y_pred.shape[0], self.domain_z.shape[0]))
 
         for i in range(Y_pred.shape[0]):
-            p_z[i] = np.exp(logL[i]) @ np.exp(-theta_estimate *
-                                              (trainM[:, t[i], None] - domain_z)**2)
+            p_z[i] = np.exp(logL[i]) @ np.exp(-self.theta_estimate *
+                                              (trainM[:, t[i], None] - self.domain_z)**2)
 
         # Normalize
         p_z_normalized = p_z / (np.sum(p_z, axis=1))[:, None]
 
         return p_z_normalized
 
-    def posterior_rulebased(self, Y_pred, t, domain_z, theta_estimate, rule_z_to_e, domain_e, p_z_precomputed=None):
+    def posterior_rulebased(self, Y_pred, t, rule_z_to_e, domain_e, p_z_precomputed=None):
         r"""For each row y in Y_pred, calculate the posterior probability
         of each rule outcome e by mapping rule over the integer values in the
         domain and summing over all integer that result in rule outcome e.
         """
         if p_z_precomputed is None:
-            p_z = self.posterior(Y_pred, t, domain_z, theta_estimate)
+            p_z = self.posterior(Y_pred, t)
         else:
             p_z = p_z_precomputed
 
@@ -169,34 +171,34 @@ class MatrixFactorization:
         for i_event, e in enumerate(domain_e):
 
             values_of_z_where_e_happens = np.argwhere(
-                [rule_z_to_e(z) for z in domain_z] == e)
+                [rule_z_to_e(z) for z in self.domain_z] == e)
 
             p_e[:, i_event] = (
                 np.sum(p_z[:, values_of_z_where_e_happens], axis=1)).flatten()
 
         return p_e
 
-    def predict(self, Y_pred, t, domain_z, theta_estimate, bias_z=None, p_z_precomputed=None):
+    def predict(self, Y_pred, t, bias_z=None, p_z_precomputed=None):
         r"""For each row y in Y_pred, calculate the highest posterior
         probability integer value for a future time t.
         """
         if p_z_precomputed is None:
-            p_z = self.posterior(Y_pred, t, domain_z, theta_estimate)
+            p_z = self.posterior(Y_pred, t)
         else:
             p_z = p_z_precomputed
 
         if bias_z is None:
-            return domain_z[np.argmax(p_z, axis=1)]
+            return self.domain_z[np.argmax(p_z, axis=1)]
         else:
-            return domain_z[np.argmax(p_z*bias_z, axis=1)]
+            return self.domain_z[np.argmax(p_z*bias_z, axis=1)]
 
-    def predict_rulebased(self, Y_pred, t, domain_z, theta_estimate, rule_z_to_e, domain_e, p_z_precomputed=None, bias_e=None, p_e_precomputed=None):
+    def predict_rulebased(self, Y_pred, t, rule_z_to_e, domain_e, p_z_precomputed=None, bias_e=None, p_e_precomputed=None):
         r"""For each row y in Y_pred, calculate the highest posterior
         probability rule outcome e for a future time t.
         """
         if p_e_precomputed is None:
             p_e = self.posterior_rulebased(
-                Y_pred, t, domain_z, theta_estimate, rule_z_to_e, domain_e, p_z_precomputed)
+                Y_pred, t, rule_z_to_e, domain_e, p_z_precomputed)
         else:
             p_e = p_e_precomputed
 

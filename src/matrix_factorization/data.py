@@ -14,6 +14,7 @@ class TemporalDataPrediction(TemporalData):
         super(TemporalDataPrediction, self).__init__(data)
 
         self.prediction_rule = prediction_rule
+        self.prediction_window = 4
 
         valid_rows = np.ones(self.X.shape[0], dtype=np.bool)
 
@@ -49,19 +50,33 @@ class TemporalDataPrediction(TemporalData):
 class TemporalDataKFold(TemporalData):
     def __init__(self, data, prediction_rule, prediction_window=4, n_splits=5):
         super(TemporalDataKFold, self).__init__(data)
-        
+
         self.prediction_rule = prediction_rule
         self.prediction_window = prediction_window
-
-        self.pred_obj = TemporalDataPrediction(data=self.X, prediction_rule=self.prediction_rule, prediction_window=self.prediction_window)
+        self.n_splits = n_splits
 
         kf = sklearn.model_selection.KFold(n_splits, shuffle=False)
         self.fold_indices = [idc for idc in kf.split(self.X)]
+        self.i_fold = 0
+        self.train_idc, self.pred_idc = self.fold_indices[self.i_fold]
 
-    def get_fold_idc(self, k):
-        return self.fold_indices[k]
+        self.train_obj = TemporalData(data=self.X)
+        self.pred_obj = TemporalDataPrediction(data=self.X, prediction_rule=self.prediction_rule, prediction_window=self.prediction_window)
 
-    def get_fold(self, k):
-        train_indices, pred_indices = self.fold_indices[k]
+        self.X_train = self.train_obj.X[self.train_idc]
+        self.X_pred_regressor = self.pred_obj.X[self.pred_idc]
+        self.y = self.pred_obj.y[self.pred_idc]
+        self.time_of_prediction = self.pred_obj.time_of_prediction[self.pred_idc]
 
-        return self.X[train_indices], self.pred_obj.X[pred_indices], self.pred_obj.y[pred_indices], self.pred_obj.time_of_prediction[pred_indices]
+    def select_fold(self, i_fold):
+        assert(i_fold < self.n_splits)
+        self.i_fold = i_fold
+        self.train_idc, self.pred_idc = self.fold_indices[i_fold]
+
+        self.X_train = self.train_obj.X[self.train_idc]
+        self.X_pred_regressor = self.pred_obj.X[self.pred_idc]
+        self.y = self.pred_obj.y[self.pred_idc]
+        self.time_of_prediction = self.pred_obj.time_of_prediction[self.pred_idc]
+
+    def get_fold_idc(self):
+        return self.fold_indices[self.i_fold]

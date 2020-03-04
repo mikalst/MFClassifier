@@ -1,4 +1,6 @@
 import numpy as np
+import sys
+import tqdm.autonotebook as tqdm
 
 
 class MatrixFactorization:
@@ -245,6 +247,14 @@ class MatrixFactorizationTesting(MatrixFactorization):
         res3 = 2 * self.lambda3 * self.RTCTCR @ V
 
         return (res1 + res2 + res3).reshape(self.T * self.K)
+
+    def train(self):
+        with tqdm.tqdm(total=self.total_iterations, file=sys.stdout) as pbar:
+            while True:
+                converged = next(self)
+                pbar.update(1)
+                if converged:
+                    break
 
 
 class MatrixFactorizationWeighted(MatrixFactorization):

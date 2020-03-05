@@ -1,18 +1,19 @@
 import sys
 import time
+import tqdm.autonotebook as tqdm
+import multiprocessing
 import numpy as np
-import scipy as sp
-import sklearn.metrics
-import h5py
-from tqdm import tqdm
 
 path_to_project_root = '../../'
 sys.path.append(path_to_project_root)
 
-import src.utils.special_matrices
 import src.simulation.simulation
+import src.utils.special_matrices
 from src.matrix_factorization.models import MatrixFactorization
 from src.matrix_factorization.data import TemporalDataKFold
+from src.matrix_factorization.metrics import evaluate_all_folds
+from src.matrix_factorization.storage import generate_empty_results, store_results
+
 
 def main(
     N_FOLDS=2,
@@ -60,105 +61,52 @@ def main(
     
     data_obj = TemporalDataKFold(X_masked, 'last_observed', n_splits=N_FOLDS)
 
-    recMSE = np.zeros((N_STEPS_L1, N_STEPS_L3, N_FOLDS))
-    predSSE = np.empty((N_STEPS_L1, N_STEPS_L3, N_FOLDS))
+    results = generate_empty_results(
+        n_lambda1=N_STEPS_L1,
+        n_lambda3=N_STEPS_L3,
+        n_folds=N_FOLDS,
+        compute_recMSE=True
+    )
 
-    bias = np.linspace(0, 1, N_STEPS_BIAS)
-    sensitivity_with_bias = np.empty((N_STEPS_L1, N_STEPS_L3, N_FOLDS, N_STEPS_BIAS))
-    specificity_with_bias = np.empty((N_STEPS_L1, N_STEPS_L3, N_FOLDS, N_STEPS_BIAS))
-
-    cms = np.empty((N_STEPS_L1, N_STEPS_L3, N_FOLDS, 4, 4))
-
-    pbar = tqdm(total=N_FOLDS*N_STEPS_L1*N_STEPS_L3)
+    pbar = tqdm.tqdm(total=N_FOLDS*N_STEPS_L1*N_STEPS_L3)
     for i_l1, l1 in enumerate(np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)):
         for i_l3, l3 in enumerate(np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)):
-            for i_fold in range(N_FOLDS):
+            
+            parameters_algorithm = {
+                'lambda0' : 1.0,
+                'lambda1' : l1,
+                'lambda2' : 0.25,
+                'lambda3' : l3,
+                'Y' : data_obj.X_train,
+                'R' : src.utils.special_matrices.finite_difference_matrix(data_obj.X_train.shape),
+                'J' : np.ones((T, K_UPPER_RANK_EST)),
+                'C' : np.identity(T),
+                'K' : K_UPPER_RANK_EST,
+                'domain_z': np.arange(1, 5),
+                'theta_estimate': 2.5,
+                'total_iterations' : 2000,
+                'convergence_tol': 1e-4
+            }
 
-                X_train, X_pred_regressor, y_pred, t_of_prediction = data_obj.get_fold(i_fold)
-                idc_train, idc_pred = data_obj.get_fold_idc(i_fold)
+            model = MatrixFactorization(parameters_algorithm)
+        
+            evaluate_all_folds(
+                model=model,
+                data_obj=data_obj,
+                output_dict=results,
+                idc_output_array=(i_l1, i_l3),
+                X_reals_ground_truth=X_reals[data_obj.train_idc]
+            )
 
-                parameters_algorithm = {
-                    'lambda0' : 1.0,
-                    'lambda1' : l1,
-                    'lambda2' : 0.25,
-                    'lambda3' : l3,
-                    'Y' : X_train,
-                    'R' : src.utils.special_matrices.finite_difference_matrix(X_train.shape),
-                    'J' : np.ones((X_train.shape[1], K_UPPER_RANK_EST)),
-                    'C' : np.identity(X_train.shape[1]),
-                    'K' : K_UPPER_RANK_EST,
-                    'total_iterations' : 2000,
-                    'convergence_tol': 1e-4
-                }
+            pbar.update()
 
-                model = MatrixFactorization(parameters_algorithm)
-                model.train()
+    store_results(
+        result_dict=results,
+        path_to_storage=path_to_project_root+"results/",
+        identifier="myrun",
+        attrs=None
+    )
 
-                # RECONSTRUCTION
-                recMSE[i_l1, i_l3] = np.mean(
-                    ((X_reals[idc_train] - model.U@(model.V.T))[X_train == 0])**2
-                )
-                predSSE[i_l1, i_l3] = np.mean(
-                    ((X_train - model.U@model.V.T)[X_train != 0])**2
-                )
-
-                posterior_probability = model.posterior(
-                    X_pred_regressor,
-                    t_of_prediction,
-                    domain_z=np.arange(1, 5),
-                    theta_estimate=THETA_EST
-                )
-
-                # Classificiation in a boolean (Sick / Healthy) setting
-                for i_bias, b in enumerate(bias):                
-                    
-                    predicted_e = model.predict_rulebased(
-                        X_pred_regressor,
-                        t_of_prediction,
-                        domain_z=np.arange(1, 5),
-                        theta_estimate=THETA_EST,
-                        p_z_precomputed=posterior_probability,
-                        rule_z_to_e= lambda x: 0 if x==1 else 1,
-                        domain_e = np.arange(0, 2),
-                        bias_e = np.array([1-b, b])
-                    )
-
-                    cm = sklearn.metrics.confusion_matrix(y_pred > 1, predicted_e)
-                    sensitivity_with_bias[i_l1, i_l3, i_fold, i_bias] = cm[1, 1] / np.sum(cm[1, :])
-                    specificity_with_bias[i_l1, i_l3, i_fold, i_bias] = cm[0, 0] / np.sum(cm[0, :])
-
-                # Classification full
-                predicted_integers = model.predict(
-                    X_pred_regressor,
-                    t_of_prediction,
-                    domain_z=np.arange(1, 5),
-                    theta_estimate=THETA_EST,
-                    p_z_precomputed=posterior_probability
-                )
-                
-                cms[i_l1, i_l3, i_fold] = sklearn.metrics.confusion_matrix(y_pred, predicted_integers)
-
-                pbar.update()
-
-    with h5py.File(
-        path_to_project_root+"results/experiments_synthetic_data/"+"run"+str(int(time.time() // 1))+".hdf5", "w"
-    ) as outfile:
-        outfile.create_dataset("sensitivity_binary", data=sensitivity_with_bias)
-        outfile.create_dataset("specificity_binary", data=specificity_with_bias)
-        outfile.create_dataset("confusion_matrices", data=cms)
-        outfile.create_dataset("recMSE", data=recMSE)
-        outfile.create_dataset("predSSE", data=predSSE)
-
-        outfile.attrs['K_UPPER_RANK_ESTIMATE']=K_UPPER_RANK_EST
-        outfile.attrs['THETA_EST']=THETA_EST
-        outfile.attrs['N_FOLDS'] = 5
-        outfile.attrs['N_STEPS_L1'] = N_STEPS_L1
-        outfile.attrs['N_STEPS_L3'] = N_STEPS_L3
-        outfile.attrs['LOW_L1'] = LOW_L1
-        outfile.attrs['HIGH_L1'] = HIGH_L1
-        outfile.attrs['LOW_L3'] = LOW_L3
-        outfile.attrs['HIGH_L3'] = HIGH_L3
-        outfile.attrs['N_STEPS_BIAS'] = N_STEPS_BIAS
 
 if __name__=='__main__':
     main(

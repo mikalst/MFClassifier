@@ -16,7 +16,7 @@ class TemporalDataPrediction(TemporalData):
         self.prediction_rule = prediction_rule
         self.prediction_window = 4
 
-        valid_rows = np.ones(self.X.shape[0], dtype=np.bool)
+        self.valid_rows = np.ones(self.X.shape[0], dtype=np.bool)
 
         # Find time of last observed entry for all rows
         if self.prediction_rule == 'last_observed':
@@ -29,15 +29,15 @@ class TemporalDataPrediction(TemporalData):
 
         # Find rows that permit the specified prediction window
         rows_satisfy_prediction_window = (time_of_prediction > prediction_window)
-        valid_rows[~rows_satisfy_prediction_window] = False
+        self.valid_rows[~rows_satisfy_prediction_window] = False
 
         # Find rows that have at least one observation before start of prediction window
         rows_satisfy_one_observation = np.argmax(self.X != 0, axis=1) < time_of_prediction - prediction_window
-        valid_rows[~rows_satisfy_one_observation] = False
+        self.valid_rows[~rows_satisfy_one_observation] = False
 
         # Remove all rows that don't satisfy the specified criteria
-        self.X = self.X[valid_rows]
-        self.time_of_prediction = time_of_prediction[valid_rows]
+        self.X = self.X[self.valid_rows]
+        self.time_of_prediction = time_of_prediction[self.valid_rows]
 
         # Copy values to be predicted
         self.y = np.copy(self.X[range(self.X.shape[0]), self.time_of_prediction])
@@ -55,13 +55,13 @@ class TemporalDataKFold(TemporalData):
         self.prediction_window = prediction_window
         self.n_splits = n_splits
 
+        self.pred_obj = TemporalDataPrediction(data=self.X, prediction_rule=self.prediction_rule, prediction_window=self.prediction_window)
+        self.train_obj = TemporalData(data=self.X[self.pred_obj.valid_rows])
+
         kf = sklearn.model_selection.KFold(n_splits, shuffle=False)
-        self.fold_indices = [idc for idc in kf.split(self.X)]
+        self.fold_indices = [idc for idc in kf.split(self.train_obj.X)]
         self.i_fold = 0
         self.train_idc, self.pred_idc = self.fold_indices[self.i_fold]
-
-        self.train_obj = TemporalData(data=self.X)
-        self.pred_obj = TemporalDataPrediction(data=self.X, prediction_rule=self.prediction_rule, prediction_window=self.prediction_window)
 
         self.X_train = self.train_obj.X[self.train_idc]
         self.X_pred_regressor = self.pred_obj.X[self.pred_idc]

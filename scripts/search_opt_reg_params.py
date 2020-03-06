@@ -3,8 +3,9 @@ import time
 import tqdm.autonotebook as tqdm
 import multiprocessing
 import numpy as np
+import copy
 
-path_to_project_root = '../../'
+path_to_project_root = '../'
 sys.path.append(path_to_project_root)
 
 import src.simulation.simulation
@@ -19,6 +20,67 @@ from src.matrix_factorization.storage import store_results
 
 def gridsearch(
     data_obj,
+    results=None,
+    idx_offset=0,
+    # output_path,
+    # output_identifier,
+    X_reals_ground_truth=None,
+    N_FOLDS=3,
+    N_STEPS_L1=25,
+    N_STEPS_L3=25,
+    LOW_L1=1,
+    HIGH_L1=1e2,
+    LOW_L3=1e3,
+    HIGH_L3=1e4,
+    N_STEPS_BIAS=101,
+    K_UPPER_RANK_EST=5, 
+    THETA_EST=2.5,
+
+):
+
+    if (results is None):
+        results = Result(
+            N_STEPS_L1=N_STEPS_L1,
+            N_STEPS_L3=N_STEPS_L3,
+            N_FOLDS=N_FOLDS,
+            N_STEPS_BIAS=N_STEPS_BIAS,
+            N_Z=4,
+            compute_recMSE=True
+        )
+
+    l1_values = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
+    l3_values = np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)
+
+    for idx in range(N_STEPS_L1*N_STEPS_L3):
+
+        k = 5
+        parameters_algorithm = {
+            'lambda0' : 1.0,
+            'lambda1' : l1_values[idx // N_STEPS_L3],
+            'lambda2' : 0.25,
+            'lambda3' : l3_values[idx % N_STEPS_L3],
+            'Y' : data_obj.X_train,
+            'R' : src.utils.special_matrices.finite_difference_matrix(data_obj.X_train.shape),
+            'J' : np.ones((data_obj.X_train.shape[1], k)),
+            'C' : np.identity(data_obj.X_train.shape[1]),
+            'K' : k,
+            'domain_z': np.arange(1, 5),
+            'theta_estimate': 2.5,
+            'total_iterations' : 2000,
+            'convergence_tol': 1e-5
+        }
+
+        model = MatrixFactorization(parameters_algorithm)
+        
+        # print(idx_offset+idx)
+
+        evaluate_all_folds(model, data_obj, results, idx_offset+idx, X_reals_ground_truth)
+
+    return results
+
+
+def gridsearch_parallelize(
+    data_obj,
     output_path,
     output_identifier,
     X_reals_ground_truth=None,
@@ -32,7 +94,7 @@ def gridsearch(
     N_STEPS_BIAS=101,
     K_UPPER_RANK_EST=5, 
     THETA_EST=2.5,
-    PARALLELIZE=True
+    N_CPU=4
 ):
 
     results = SharedMemoryResult(
@@ -44,44 +106,44 @@ def gridsearch(
         compute_recMSE=True
     )
 
-    N, T = data_obj.X_train.shape
+    N_STEPS_L1_PER_CPU = N_STEPS_L1 // N_CPU
 
-    pbar = tqdm.tqdm(total=N_STEPS_L1*N_STEPS_L3)
-    for i_l1, l1 in enumerate(np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)):
-        for i_l3, l3 in enumerate(np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)):
-            
-            parameters_algorithm = {
-                'lambda0' : 1.0,
-                'lambda1' : l1,
-                'lambda2' : 0.25,
-                'lambda3' : l3,
-                'Y' : data_obj.X_train,
-                'R' : src.utils.special_matrices.finite_difference_matrix(data_obj.X_train.shape),
-                'J' : np.ones((T, K_UPPER_RANK_EST)),
-                'C' : np.identity(T),
-                'K' : K_UPPER_RANK_EST,
-                'domain_z': np.arange(1, 5),
-                'theta_estimate': 2.5,
-                'total_iterations' : 2000,
-                'convergence_tol': 1e-4
-            }
+    queue = multiprocessing.Queue()
 
-            model = MatrixFactorization(parameters_algorithm)
-        
-            evaluate_all_folds(
-                model=model,
-                data_obj=data_obj,
-                output_dict=results,
-                idx_output_array=i_l1*N_STEPS_L1 + i_l3,
-                X_reals_ground_truth=X_reals_ground_truth
+    workers = []
+    for i_cpu in range(N_CPU):
+        data_obj_copy = copy.deepcopy(data_obj)
+        workers.append(multiprocessing.Process(target=gridsearch, args=
+                (
+                    data_obj_copy,
+                    results,
+                    int(i_cpu*N_STEPS_L3*N_STEPS_L1_PER_CPU),
+                    X_reals_ground_truth,
+                    N_FOLDS,
+                    N_STEPS_L1_PER_CPU,
+                    N_STEPS_L3,
+                    LOW_L1+i_cpu*(HIGH_L1 - LOW_L1)/N_CPU,
+                    LOW_L1+(i_cpu+1)*(HIGH_L1 - LOW_L1)/N_CPU,
+                    LOW_L3,
+                    HIGH_L3,
+                    N_STEPS_BIAS,
+                    K_UPPER_RANK_EST,
+                    THETA_EST
+                )
             )
-
-            pbar.update()
+        )
+    print(workers)
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join()
+    while not queue.empty():
+        print(queue.get())
 
     store_results(
-        result_obj=results,
-        path_to_storage=output_path,
-        identifier=output_identifier
+       result_obj=results,
+       path_to_storage=output_path,
+       identifier=output_identifier
     )
 
 
@@ -129,10 +191,10 @@ def gridsearch_synthetic_data(
     
     data_obj = TemporalDataKFold(X_masked, 'last_observed', n_splits=N_FOLDS)
 
-    gridsearch(
+    gridsearch_parallelize(
         data_obj,
         output_path=path_to_project_root+'results/experiments_synthetic_data/',
-        output_identifier="run"+str(time.time() // 1)+".hdf5",
+        output_identifier=r"run{:d}.hdf5".format(int(time.time())),
         X_reals_ground_truth=X_reals,
         N_FOLDS=N_FOLDS,
         N_STEPS_L1=N_STEPS_L1,
@@ -143,8 +205,7 @@ def gridsearch_synthetic_data(
         HIGH_L3=HIGH_L3,
         N_STEPS_BIAS=N_STEPS_BIAS,
         K_UPPER_RANK_EST=K_UPPER_RANK_EST, 
-        THETA_EST=THETA_EST,
-        PARALLELIZE=True  
+        THETA_EST=THETA_EST
     )
 
 
@@ -166,8 +227,8 @@ def gridsearch_jerome_data(
 
     gridsearch(
         data_obj,
-        output_path=path_to_project_root+'results/experiments_jerome_data/',
-        output_identifier="run"+str(time.time() // 1)+".hdf5",
+        # output_path=path_to_project_root+'results/experiments_jerome_data/',
+        # output_identifier=r"run{:d}.hdf5".format(int(time.time())),
         N_FOLDS=N_FOLDS,
         N_STEPS_L1=N_STEPS_L1,
         N_STEPS_L3=N_STEPS_L3,
@@ -177,13 +238,12 @@ def gridsearch_jerome_data(
         HIGH_L3=HIGH_L3,
         N_STEPS_BIAS=N_STEPS_BIAS,
         K_UPPER_RANK_EST=K_UPPER_RANK_EST, 
-        THETA_EST=THETA_EST,
-        PARALLELIZE=True  
+        THETA_EST=THETA_EST
     )
 
 
-
 if __name__=='__main__':
+    
     gridsearch_synthetic_data(
         N_FOLDS=int(sys.argv[1]),
         N_STEPS_L1=int(sys.argv[2]),

@@ -52,6 +52,23 @@ class MatrixFactorization:
         self.L2, self.Q2 = np.linalg.eigh(
             (self.lambda3 / self.lambda0) * self.RTCTCR)
 
+    def reset(self, hard=False):
+        
+        self.nonzero_rows, self.nonzero_cols = np.nonzero(self.Y)
+        self.N = self.Y.shape[0]
+
+        # Re-initialize U
+        self.U = np.ones((self.N, self.K))
+
+        if hard:
+            self.V = np.ones((self.T, self.K)) * \
+                np.mean(self.Y[self.nonzero_rows, self.nonzero_cols])
+
+        self.S = self.Y.copy()
+        self.U_old = np.zeros((self.N, self.K))
+        self.V_old = np.zeros((self.T, self.K))
+        self.iteration = 0
+
     def solve1(self):
         U = (
             np.linalg.solve(

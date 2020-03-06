@@ -5,13 +5,13 @@ import h5py
 class Result(dict):
     def __init__(self, N_STEPS_L1, N_STEPS_L3, N_FOLDS, N_Z, N_STEPS_BIAS, compute_recMSE=False):
 
-        self['cms'] = np.empty(shape=(N_STEPS_L1*N_STEPS_L3*N_FOLDS*N_Z**2))
-        self['sensitivity_with_bias'] = np.empty(shape=(N_STEPS_L1*N_STEPS_L3*N_FOLDS*N_STEPS_BIAS))
-        self['specificity_with_bias'] = np.empty(shape=(N_STEPS_L1*N_STEPS_L3*N_FOLDS*N_STEPS_BIAS))
-        self['predSSE'] = np.empty(shape=(N_STEPS_L1*N_STEPS_L3*N_FOLDS))
+        self['cms'] = -np.ones(shape=(N_STEPS_L1*N_STEPS_L3*N_FOLDS*N_Z**2))
+        self['sensitivity_with_bias'] = -np.ones(shape=(N_STEPS_L1*N_STEPS_L3*N_FOLDS*N_STEPS_BIAS))
+        self['specificity_with_bias'] = -np.ones(shape=(N_STEPS_L1*N_STEPS_L3*N_FOLDS*N_STEPS_BIAS))
+        self['predSSE'] = -np.ones(shape=(N_STEPS_L1*N_STEPS_L3*N_FOLDS))
         
         if compute_recMSE:
-            self['recMSE'] = np.empty(shape=(N_STEPS_L1*N_STEPS_L3*N_FOLDS))
+            self['recMSE'] = -np.ones(shape=(N_STEPS_L1*N_STEPS_L3*N_FOLDS))
 
         self.attrs = {
             'N_STEPS_L1': N_STEPS_L1,
@@ -36,8 +36,8 @@ def store_results(result_obj, path_to_storage, identifier):
     ) as outfile:
         
         shape = (
-            result_obj.attrs['N_STEPS_L3'],
             result_obj.attrs['N_STEPS_L1'],
+            result_obj.attrs['N_STEPS_L3'],
             result_obj.attrs['N_FOLDS']
         )
 

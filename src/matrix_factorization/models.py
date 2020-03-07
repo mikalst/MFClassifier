@@ -2,6 +2,10 @@ import numpy as np
 import sys
 import tqdm.autonotebook as tqdm
 
+sys.path.append('../')
+
+from src.utils.special_matrices import finite_difference_matrix
+
 
 class MatrixFactorization:
     r"""A class for solving the inverse problem
@@ -13,38 +17,42 @@ class MatrixFactorization:
     approximation of temporal patient data.
     """
 
-    def __init__(self, args):
+    def __init__(
+        self,
+        lambda_reg_params=(1., 0., 0., 0.),
+        K=5,
+        domain_z=np.arange(1, 10),
+        theta=2.5,
+        T=100,
+        R=None,
+        J=None,
+        C=None,
+        total_iterations=1000,
+        tolerance=1e-4
+    ):
         # Regularization parameters
-        self.lambda0 = args["lambda0"]
-        self.lambda1 = args["lambda1"]
-        self.lambda2 = args["lambda2"]
-        self.lambda3 = args["lambda3"]
+        self.lambda0 = lambda_reg_params[0]
+        self.lambda1 = lambda_reg_params[1]
+        self.lambda2 = lambda_reg_params[2]
+        self.lambda3 = lambda_reg_params[3]
 
-        self.Y = args["Y"]  # Input data
-        self.R = args["R"]  # Operation on temporal profile
-        self.J = args["J"]  # Default temporal profile
-        self.C = args["C"]  # Convolution
+        self.K = K  # Rank
+        self.domain_z = domain_z # Domain of integer values
+        self.theta = theta # Parameter in the gaussian kernel
+        self.T = T # Time granularity
 
-        self.K = args["K"]  # Rank
-        self.domain_z = args["domain_z"] # Domain of integer values
-        self.theta_estimate = args["theta_estimate"] # Parameter in the gaussian kernel
+        if (R is None):
+            self.R = finite_difference_matrix(T)
 
-        self.nonzero_rows, self.nonzero_cols = np.nonzero(self.Y)
-        self.N = self.Y.shape[0]
-        self.T = self.Y.shape[1]
+        if (J is None):
+            self.J = np.zeros((T, K))
 
-        # Initialize U, V and S
-        self.U = np.ones((self.N, self.K))
-        self.V = np.ones((self.T, self.K)) * \
-            np.mean(self.Y[self.nonzero_rows, self.nonzero_cols])
-        self.S = self.Y.copy()
-
-        self.U_old = np.zeros((self.N, self.K))
-        self.V_old = np.zeros((self.T, self.K))
+        if (C is None):
+            self.C = np.identity(T)
 
         self.iteration = 0
-        self.total_iterations = args["total_iterations"]
-        self.tol = args["convergence_tol"]
+        self.total_iterations = total_iterations
+        self.tolerance = tolerance
 
         # Code optimization purposes
         # Static variables are computed and stored
@@ -52,23 +60,31 @@ class MatrixFactorization:
         self.L2, self.Q2 = np.linalg.eigh(
             (self.lambda3 / self.lambda0) * self.RTCTCR)
 
-    def reset(self, hard=False):
-        
+    def fit(self, Y):
+        self.Y = Y
+
         self.nonzero_rows, self.nonzero_cols = np.nonzero(self.Y)
         self.N = self.Y.shape[0]
 
-        # Re-initialize U
+        # Initialize U
         self.U = np.ones((self.N, self.K))
         self.U_old = np.zeros((self.N, self.K))
-
-        if hard:
-            self.V = np.ones((self.T, self.K)) * \
-                np.mean(self.Y[self.nonzero_rows, self.nonzero_cols])
-            self.V_old = np.zeros((self.T, self.K))
-
+        # Initialize V
+        self.V = np.ones((self.T, self.K)) * \
+            np.mean(self.Y[self.nonzero_rows, self.nonzero_cols])
+        self.V_old = np.zeros((self.T, self.K))
+        # Initialize S
         self.S = self.Y.copy()
-        
+
         self.iteration = 0
+
+        # Train
+        self.train()
+        
+    def resetV(self):
+        self.V = np.ones((self.T, self.K)) * \
+            np.mean(self.Y[self.nonzero_rows, self.nonzero_cols])
+        self.V_old = np.zeros((self.T, self.K))
 
     def solve1(self):
         U = (
@@ -123,7 +139,7 @@ class MatrixFactorization:
             if (
                 np.linalg.norm(self.U_old @ self.V_old.T - self.U @ self.V.T)
                 / np.linalg.norm(self.U @ self.V.T)
-                < self.tol
+                < self.tolerance
             ) or self.iteration > self.total_iterations:
                 return True
             return False
@@ -153,7 +169,7 @@ class MatrixFactorization:
             eta_i = (Y_pred[i, row_nonzero_cols])[None, :] - M_train[
                 :, row_nonzero_cols
             ]
-            logL[i] = np.sum(-self.theta_estimate*np.power(eta_i, 2), axis=1)
+            logL[i] = np.sum(-self.theta*np.power(eta_i, 2), axis=1)
 
         return logL
 
@@ -168,7 +184,7 @@ class MatrixFactorization:
         p_z = np.empty((Y_pred.shape[0], self.domain_z.shape[0]))
 
         for i in range(Y_pred.shape[0]):
-            p_z[i] = np.exp(logL[i]) @ np.exp(-self.theta_estimate *
+            p_z[i] = np.exp(logL[i]) @ np.exp(-self.theta *
                                               (trainM[:, t[i], None] - self.domain_z)**2)
 
         # Normalize

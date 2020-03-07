@@ -59,16 +59,12 @@ def evaluate_all_folds(model, data_obj, output_result_obj, idx_output_result, X_
 
     for i_fold in range(N_FOLDS):
 
-        print('Selecting fold {}'.format(i_fold))
-
         data_obj.select_fold(i_fold)
         model.Y = data_obj.X_train
         model.reset()
         model.train()
 
         evaluate(model, data_obj, output_result_obj, N_FOLDS*idx_output_result+i_fold, X_reals_ground_truth=X_reals_ground_truth)
-
-        print(np.array(output_result_obj['recMSE']))
 
         if verbose:
             pbar.update()

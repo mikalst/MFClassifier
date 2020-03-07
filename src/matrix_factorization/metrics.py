@@ -4,14 +4,16 @@ import copy
 import tqdm.autonotebook as tqdm
 
 
-def evaluate(model, data_obj, output_result_obj, idx_output_result, X_reals_ground_truth=None):
+def evaluate(model, data_obj, output_result_obj, idx_output_result):
+
+    print("Index {}".format(idx_output_result))
 
     N_STEPS_BIAS = output_result_obj.attrs['N_STEPS_BIAS']
     N_Z = output_result_obj.attrs['N_Z']
 
-    if not(X_reals_ground_truth is None):
+    if not(data_obj.ground_truth is None):
         output_result_obj['recMSE'][idx_output_result] = np.mean(
-            ((X_reals_ground_truth[data_obj.train_idc] -
+            ((data_obj.ground_truth_train -
               model.U@(model.V.T))[data_obj.X_train == 0])**2
         )
 
@@ -50,7 +52,7 @@ def evaluate(model, data_obj, output_result_obj, idx_output_result, X_reals_grou
         data_obj.y_pred, predicted_integers, labels=range(1, N_Z+1))).flatten()
 
 
-def evaluate_all_folds(model, data_obj, output_result_obj, idx_output_result, X_reals_ground_truth=None, verbose=False):
+def evaluate_all_folds(model, data_obj, output_result_obj, idx_output_result, verbose=False):
 
     N_FOLDS = data_obj.n_splits
 
@@ -59,12 +61,10 @@ def evaluate_all_folds(model, data_obj, output_result_obj, idx_output_result, X_
 
     for i_fold in range(N_FOLDS):
 
-        data_obj.select_fold(i_fold)
-        model.Y = data_obj.X_train
-        model.reset()
-        model.train()
+        data_obj.i_fold = i_fold
+        model.fit(data_obj.X_train)
 
-        evaluate(model, data_obj, output_result_obj, N_FOLDS*idx_output_result+i_fold, X_reals_ground_truth=X_reals_ground_truth)
+        evaluate(model, data_obj, output_result_obj, N_FOLDS*idx_output_result+i_fold)
 
         if verbose:
             pbar.update()

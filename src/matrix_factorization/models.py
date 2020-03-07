@@ -59,14 +59,15 @@ class MatrixFactorization:
 
         # Re-initialize U
         self.U = np.ones((self.N, self.K))
+        self.U_old = np.zeros((self.N, self.K))
 
         if hard:
             self.V = np.ones((self.T, self.K)) * \
                 np.mean(self.Y[self.nonzero_rows, self.nonzero_cols])
+            self.V_old = np.zeros((self.T, self.K))
 
         self.S = self.Y.copy()
-        self.U_old = np.zeros((self.N, self.K))
-        self.V_old = np.zeros((self.T, self.K))
+        
         self.iteration = 0
 
     def solve1(self):

@@ -20,95 +20,30 @@ from src.matrix_factorization.storage import store_results
 
 def gridsearch(
     data_obj,
-    results=None,
-    idx_offset=0,
-    # output_path,
-    # output_identifier,
+    model_generator,
+    idc_parameter_select,
+    results,
     X_reals_ground_truth=None,
-    N_FOLDS=3,
-    N_STEPS_L1=25,
-    N_STEPS_L3=25,
-    LOW_L1=1,
-    HIGH_L1=1e2,
-    LOW_L3=1e3,
-    HIGH_L3=1e4,
-    N_STEPS_BIAS=101,
-    K_UPPER_RANK_EST=5, 
-    THETA_EST=2.5,
-
 ):
 
-    if (results is None):
-        results = Result(
-            N_STEPS_L1=N_STEPS_L1,
-            N_STEPS_L3=N_STEPS_L3,
-            N_FOLDS=N_FOLDS,
-            N_STEPS_BIAS=N_STEPS_BIAS,
-            N_Z=4,
-            compute_recMSE=True
-        )
-
-    l1_values = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
-    l3_values = np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)
-
-    for idx in range(N_STEPS_L1*N_STEPS_L3):
-
-        k = 5
-        parameters_algorithm = {
-            'lambda0' : 1.0,
-            'lambda1' : l1_values[idx // N_STEPS_L3],
-            'lambda2' : 0.25,
-            'lambda3' : l3_values[idx % N_STEPS_L3],
-            'Y' : data_obj.X_train,
-            'R' : src.utils.special_matrices.finite_difference_matrix(data_obj.X_train.shape),
-            'J' : np.ones((data_obj.X_train.shape[1], k)),
-            'C' : np.identity(data_obj.X_train.shape[1]),
-            'K' : k,
-            'domain_z': np.arange(1, 5),
-            'theta_estimate': 2.5,
-            'total_iterations' : 2000,
-            'convergence_tol': 1e-5
-        }
-
-        model = MatrixFactorization(parameters_algorithm)
-        
-        # print(idx_offset+idx)
-
-        evaluate_all_folds(model, data_obj, results, idx_offset+idx, X_reals_ground_truth)
+    for idx in idc_parameter_select:
+    
+        model = model_generator(idx, data_obj)
+        evaluate_all_folds(model, data_obj, results, idx, X_reals_ground_truth)
 
     return results
 
 
 def gridsearch_parallelize(
     data_obj,
-    output_path,
-    output_identifier,
+    model_generator,
+    idc_parameter_select,
+    results,
     X_reals_ground_truth=None,
-    N_FOLDS=3,
-    N_STEPS_L1=25,
-    N_STEPS_L3=25,
-    LOW_L1=1,
-    HIGH_L1=1e2,
-    LOW_L3=1e3,
-    HIGH_L3=1e4,
-    N_STEPS_BIAS=101,
-    K_UPPER_RANK_EST=5, 
-    THETA_EST=2.5,
     N_CPU=4
 ):
 
-    results = SharedMemoryResult(
-        N_STEPS_L1=N_STEPS_L1,
-        N_STEPS_L3=N_STEPS_L3,
-        N_FOLDS=N_FOLDS,
-        N_STEPS_BIAS=N_STEPS_BIAS,
-        N_Z=4,
-        compute_recMSE=True
-    )
-
-    N_STEPS_L1_PER_CPU = N_STEPS_L1 // N_CPU
-
-    queue = multiprocessing.Queue()
+    idc_per_cpu = np.array_split(idc_parameter_select, N_CPU)
 
     workers = []
     for i_cpu in range(N_CPU):
@@ -116,35 +51,18 @@ def gridsearch_parallelize(
         workers.append(multiprocessing.Process(target=gridsearch, args=
                 (
                     data_obj_copy,
+                    model_generator,
+                    idc_per_cpu[i_cpu],
                     results,
-                    int(i_cpu*N_STEPS_L3*N_STEPS_L1_PER_CPU),
-                    X_reals_ground_truth,
-                    N_FOLDS,
-                    N_STEPS_L1_PER_CPU,
-                    N_STEPS_L3,
-                    LOW_L1+i_cpu*(HIGH_L1 - LOW_L1)/N_CPU,
-                    LOW_L1+(i_cpu+1)*(HIGH_L1 - LOW_L1)/N_CPU,
-                    LOW_L3,
-                    HIGH_L3,
-                    N_STEPS_BIAS,
-                    K_UPPER_RANK_EST,
-                    THETA_EST
+                    X_reals_ground_truth
                 )
             )
         )
-    print(workers)
+
     for worker in workers:
         worker.start()
     for worker in workers:
         worker.join()
-    while not queue.empty():
-        print(queue.get())
-
-    store_results(
-       result_obj=results,
-       path_to_storage=output_path,
-       identifier=output_identifier
-    )
 
 
 def gridsearch_synthetic_data(
@@ -160,6 +78,7 @@ def gridsearch_synthetic_data(
     THETA_EST=2.5,
     PARALLELIZE=True
 ):
+    # Prepare data
     X_reals = np.load(path_to_project_root +'data/synthetic/X_train_reals.npy')
 
     parameters_simulate_integer = {
@@ -189,23 +108,60 @@ def gridsearch_synthetic_data(
 
     X_masked = X_integers*mask
     
+    # Create data object
     data_obj = TemporalDataKFold(X_masked, 'last_observed', n_splits=N_FOLDS)
 
-    gridsearch_parallelize(
-        data_obj,
-        output_path=path_to_project_root+'results/experiments_synthetic_data/',
-        output_identifier=r"run{:d}.hdf5".format(int(time.time())),
-        X_reals_ground_truth=X_reals,
-        N_FOLDS=N_FOLDS,
+    # Allocated empty results object
+    results = SharedMemoryResult(
         N_STEPS_L1=N_STEPS_L1,
         N_STEPS_L3=N_STEPS_L3,
-        LOW_L1=LOW_L1,
-        HIGH_L1=HIGH_L1,
-        LOW_L3=LOW_L3,
-        HIGH_L3=HIGH_L3,
+        N_FOLDS=N_FOLDS,
         N_STEPS_BIAS=N_STEPS_BIAS,
-        K_UPPER_RANK_EST=K_UPPER_RANK_EST, 
-        THETA_EST=THETA_EST
+        N_Z=4,
+        compute_recMSE=True
+    )
+
+    # Create indices that select a particular model
+    idc_parameter_select = np.arange(0, N_STEPS_L1*N_STEPS_L3)
+
+    l1_values = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
+    l3_values = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
+
+    # Prepare a model generator that yields a model for every index
+    def model_generator(idx, data_obj):
+
+        parameters_algorithm = {
+            'lambda0' : 1.0,
+            'lambda1' : l1_values[idx // N_STEPS_L3],
+            'lambda2' : 0.25,
+            'lambda3' : l3_values[idx % N_STEPS_L3],
+            'Y' : data_obj.X_train,
+            'R' : src.utils.special_matrices.finite_difference_matrix(data_obj.X_train.shape),
+            'J' : np.ones((data_obj.X_train.shape[1], 5)),
+            'C' : np.identity(data_obj.X_train.shape[1]),
+            'K' : 5,
+            'domain_z': np.arange(1, 5),
+            'theta_estimate': 2.5,
+            'total_iterations' : 2000,
+            'convergence_tol': 1e-4
+        }
+
+        return MatrixFactorization(parameters_algorithm)
+
+    # Search in parallel over all possible models
+    gridsearch_parallelize(
+        data_obj,
+        model_generator,
+        idc_parameter_select,
+        results,
+        X_reals_ground_truth=X_reals,
+        N_CPU=4
+    )
+
+    store_results(
+        result_obj=results,
+        path_to_storage=path_to_project_root+'results/experiments_synthetic_data/',
+        identifier=r"run{:d}.hdf5".format(int(time.time())),
     )
 
 
@@ -222,24 +178,8 @@ def gridsearch_jerome_data(
     THETA_EST=2.5,
     PARALLELIZE=True
 ):
-    data = np.load(path_to_project_root+"data/jerome_processed/training_data.npy")
-    data_obj = TemporalDataKFold(data, 'last_observed', n_splits=N_FOLDS)
-
-    gridsearch(
-        data_obj,
-        # output_path=path_to_project_root+'results/experiments_jerome_data/',
-        # output_identifier=r"run{:d}.hdf5".format(int(time.time())),
-        N_FOLDS=N_FOLDS,
-        N_STEPS_L1=N_STEPS_L1,
-        N_STEPS_L3=N_STEPS_L3,
-        LOW_L1=LOW_L1,
-        HIGH_L1=HIGH_L1,
-        LOW_L3=LOW_L3,
-        HIGH_L3=HIGH_L3,
-        N_STEPS_BIAS=N_STEPS_BIAS,
-        K_UPPER_RANK_EST=K_UPPER_RANK_EST, 
-        THETA_EST=THETA_EST
-    )
+    # Not yet implemented
+    pass
 
 
 if __name__=='__main__':

@@ -3,7 +3,6 @@ import time
 import tqdm.autonotebook as tqdm
 import multiprocessing
 import numpy as np
-import copy
 
 path_to_project_root = '../'
 sys.path.append(path_to_project_root)
@@ -11,52 +10,10 @@ sys.path.append(path_to_project_root)
 import src.simulation.simulation
 import src.utils.special_matrices
 from src.matrix_factorization.models import MatrixFactorization
-from src.matrix_factorization.data import TemporalDataKFold
-from src.matrix_factorization.data import TemporalDataPrediction
-from src.matrix_factorization.metrics import evaluate_all_folds
-from src.matrix_factorization.storage import Result, SharedMemoryResult
-from src.matrix_factorization.storage import store_results
-
-
-def gridsearch(
-    data_obj,
-    model_generator,
-    idc_parameter_select,
-    results
-):
-
-    for idx in idc_parameter_select:
-    
-        model = model_generator(idx, data_obj)
-        evaluate_all_folds(model, data_obj, results, idx)
-
-
-def gridsearch_parallelize(
-    data_obj,
-    model_generator,
-    idc_parameter_select,
-    results,
-    N_CPU=4
-):
-
-    idc_per_cpu = np.array_split(idc_parameter_select, N_CPU)
-
-    workers = []
-    for i_cpu in range(N_CPU):
-        workers.append(multiprocessing.Process(target=gridsearch, args=
-                (
-                    data_obj,
-                    model_generator,
-                    idc_per_cpu[i_cpu],
-                    results
-                )
-            )
-        )
-
-    for worker in workers:
-        worker.start()
-    for worker in workers:
-        worker.join()
+from src.matrix_factorization.data import TemporalDatasetKFold
+from src.matrix_factorization.data import TemporalDatasetPredict
+from src.matrix_factorization.tuning import Result, SharedMemoryResult
+from src.matrix_factorization.tuning import search, search_parallelize
 
 
 def gridsearch_synthetic_data(
@@ -72,7 +29,7 @@ def gridsearch_synthetic_data(
     THETA_EST=2.5,
     PARALLELIZE=False
 ):
-    # Prepare data
+    # Prepare synthetic data
     X_reals = np.load(path_to_project_root +'data/synthetic/X_train_reals.npy')
 
     parameters_simulate_integer = {
@@ -103,23 +60,19 @@ def gridsearch_synthetic_data(
     X_masked = X_integers*mask
     
     # Create data object
-    data_obj = TemporalDataKFold(X_masked, ground_truth=X_reals, prediction_rule='last_observed', n_splits=N_FOLDS)
-
-    # Create indices that select a particular model
-    idc_parameter_select = np.arange(0, N_STEPS_L1*N_STEPS_L3)
-
-    l1_values = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
-    l3_values = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
+    data_obj = TemporalDatasetKFold(X_masked, ground_truth=X_reals, prediction_rule='last_observed', n_splits=N_FOLDS)
 
     # Prepare a model generator that yields a model for every index
-    def model_generator(idx, data_obj):
+    def model_generator(idx):
+
+        l1_vals = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
+        l3_vals = np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)
+
         return MatrixFactorization(
-            lambda_reg_params=(
-                1.0,
-                l1_values[idx // N_STEPS_L3],
-                0.25,
-                l3_values[idx % N_STEPS_L3]
-            ),
+            lambda0=1.0,
+            lambda1=l1_vals[idx // N_STEPS_L3],
+            lambda2=0.25,
+            lambda3=l3_vals[idx % N_STEPS_L3],
             K=5,
             domain_z=np.arange(1, 5),
             total_iterations=2000,
@@ -127,11 +80,13 @@ def gridsearch_synthetic_data(
             T=321
         )
 
+    # Create indices that select a particular model
+    idc_parameter_select = np.arange(0, N_STEPS_L1*N_STEPS_L3)
+
     if PARALLELIZE:
         # Allocated empty results object
         results = SharedMemoryResult(
-            N_STEPS_L1=N_STEPS_L1,
-            N_STEPS_L3=N_STEPS_L3,
+            N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
             N_FOLDS=N_FOLDS,
             N_STEPS_BIAS=N_STEPS_BIAS,
             N_Z=4,
@@ -139,7 +94,7 @@ def gridsearch_synthetic_data(
         )
 
         # Search in parallel over all possible models
-        gridsearch_parallelize(
+        search_parallelize(
             data_obj,
             model_generator,
             idc_parameter_select,
@@ -149,23 +104,21 @@ def gridsearch_synthetic_data(
     else:
         # Allocated empty results object
         results = Result(
-            N_STEPS_L1=N_STEPS_L1,
-            N_STEPS_L3=N_STEPS_L3,
+            N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
             N_FOLDS=N_FOLDS,
             N_STEPS_BIAS=N_STEPS_BIAS,
             N_Z=4,
             compute_recMSE=True
         )
-        gridsearch(
+        search(
             data_obj,
             model_generator,
             idc_parameter_select,
             results
         )
     
-    store_results(
-        result_obj=results,
-        path_to_storage=path_to_project_root+'results/experiments_synthetic_data/',
+    results.save(
+        path=path_to_project_root+'results/experiments_synthetic_data/',
         identifier=r"run{:d}.hdf5".format(int(time.time())),
     )
 

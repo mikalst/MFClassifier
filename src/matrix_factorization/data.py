@@ -2,7 +2,7 @@ import numpy as np
 import sklearn.model_selection
 
 
-class TemporalData:
+class TemporalDatasetTrain:
     def __init__(self, data, ground_truth=None):
         self.X = np.array(data)
         self.N = self.X.shape[0]
@@ -12,9 +12,9 @@ class TemporalData:
             self.ground_truth = ground_truth
 
 
-class TemporalDataPrediction(TemporalData):
+class TemporalDatasetPredict(TemporalDatasetTrain):
     def __init__(self, data, ground_truth=None, prediction_rule='last_observed', prediction_window=4):
-        super(TemporalDataPrediction, self).__init__(data, ground_truth)
+        super(TemporalDatasetPredict, self).__init__(data, ground_truth)
 
         self.prediction_rule = prediction_rule
         self.prediction_window = 4
@@ -50,7 +50,7 @@ class TemporalDataPrediction(TemporalData):
             self.X[i_row, self.time_of_prediction[i_row]:] = 0
 
 
-class TemporalDataKFold(TemporalData):
+class TemporalDatasetKFold(TemporalDatasetTrain):
     def __init__(self, data, ground_truth=None, prediction_rule='last_observed', prediction_window=4, n_splits=5):
 
         if not(ground_truth is None):
@@ -60,8 +60,8 @@ class TemporalDataKFold(TemporalData):
         self.prediction_window = prediction_window
         self.n_splits = n_splits
 
-        self.__pred_obj = TemporalDataPrediction(data=data, prediction_rule=self.prediction_rule, prediction_window=self.prediction_window)
-        self.__train_obj = TemporalData(data=data[self.__pred_obj.valid_rows])
+        self.__pred_obj = TemporalDatasetPredict(data=data, prediction_rule=self.prediction_rule, prediction_window=self.prediction_window)
+        self.__train_obj = TemporalDatasetTrain(data=data[self.__pred_obj.valid_rows])
 
         kf = sklearn.model_selection.KFold(n_splits, shuffle=False)
         self.__idc_per_fold = [idc_fold for idc_fold in kf.split(self.__train_obj.X)]

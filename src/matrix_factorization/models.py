@@ -20,10 +20,13 @@ class MatrixFactorization:
 
     def __init__(
         self,
-        lambda_reg_params=(1., 0., 0., 0.),
+        lambda0=1.,
+        lambda1=0.,
+        lambda2=0.,
+        lambda3=0.,
         K=5,
-        domain_z=np.arange(1, 10),
         theta=2.5,
+        domain_z=np.arange(1, 10),
         T=100,
         R=None,
         J=None,
@@ -32,10 +35,10 @@ class MatrixFactorization:
         tolerance=1e-4
     ):
         # Regularization parameters
-        self.lambda0 = lambda_reg_params[0]
-        self.lambda1 = lambda_reg_params[1]
-        self.lambda2 = lambda_reg_params[2]
-        self.lambda3 = lambda_reg_params[3]
+        self.lambda0 = lambda0
+        self.lambda1 = lambda1
+        self.lambda2 = lambda2
+        self.lambda3 = lambda3
 
         self.K = K  # Rank
         self.domain_z = domain_z  # Domain of integer values
@@ -248,6 +251,15 @@ class MatrixFactorization:
 
         print("Index {}".format(idx_output))
 
+        # Store input parameters
+        output_obj['lambda0'][idx_output] = self.lambda0
+        output_obj['lambda1'][idx_output] = self.lambda1
+        output_obj['lambda2'][idx_output] = self.lambda2
+        output_obj['lambda3'][idx_output] = self.lambda3
+        output_obj['K'][idx_output] = self.K
+        output_obj['theta'][idx_output] = self.theta
+
+        # Store scoring measures
         if not(data_obj.ground_truth is None):
             output_obj['recMSE'][idx_output] = np.mean(
                 ((data_obj.ground_truth_train -

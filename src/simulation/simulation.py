@@ -5,6 +5,44 @@ Algorithms for simulating matrices that exhibit the same characteristics as Norw
 import numpy as np
 
 
+def simulate_float_from_named_basis(basis_name, N, T, K, domain=[1, 4], random_state=None):
+
+    if not(random_state is None):
+        np.random.seed(random_state)
+
+    if basis_name == 'simple_peaks':
+        V = np.empty(shape=(T, K))
+
+        centers = np.linspace(70, 170, K)
+
+        x = np.linspace(0, T, T)
+        for i_k in range(K):
+            V[:, i_k] = 1 + 3.0 * np.exp(-5e-4*(x - centers[i_k])**2)
+
+        shape=1.0
+        scale=1.0
+
+    elif basis_name == 'hard_peaks':
+        V = np.empty(shape=(T, K))
+
+        centers = np.linspace(70, 170, K)
+
+        x = np.linspace(0, T, T)
+        for i_k in range(K):
+            V[i_k] = 1 + 3.0 * np.exp(-5e-4*(x - centers[i_k]**2))
+
+        shape=1.0
+        scale=10.0
+
+    U = np.random.gamma(shape, scale, size=(N, K))
+
+    M_unscaled = U@V.T
+
+    M = domain[0] + (M_unscaled - np.min(M_unscaled))/(np.max(M_unscaled) - np.min(M_unscaled))*(domain[1] - domain[0])
+
+    return M
+
+
 def simulate_integer_from_float(
     X_float_unscaled,
     integer_parameters,
@@ -96,8 +134,7 @@ def simulate_mask(
     ----------
     mask : The resulting mask.
     """
-    mask_transition_expectations = mask_parameters['mask_transition_expectations']
-    mask_transition_variances = mask_parameters['mask_transition_variances']
+    mask_screening_proba = mask_parameters['mask_screening_proba']
     mask_memory_length = mask_parameters['memory_length']
     mask_level = mask_parameters['mask_level']
 
@@ -106,24 +143,16 @@ def simulate_mask(
 
     mask = np.zeros_like(X_integer, dtype=np.bool)
     observed_values = np.zeros((N, T))
-    individual_probs = np.empty((N, mask_transition_expectations.shape[0]))
 
     if not(random_state is None):
         np.random.seed(random_state)
-
-    # Assign individual transition probabilities
-    for i in range(mask_transition_expectations.shape[0]):
-        individual_probs[:, i] = np.random.beta(mask_transition_variances[i]*mask_transition_expectations[i],
-                                                mask_transition_variances[i]*(1-mask_transition_expectations[i]), size=N)
 
     for t in range(T - 1):
         # Find last remembered values
         last_remembered_values = observed_values[np.arange(
             N), t+1-np.argmax(observed_values[:, t+1:max(0, t-mask_memory_length):-1] != 0, axis=1)]
 
-        indices = ((np.arange(np.max(X_integer)+1))
-                   [:, None] == last_remembered_values).T
-        p = mask_level*individual_probs[indices]
+        p = mask_level*mask_screening_proba[(last_remembered_values).astype(int)]
         r = np.random.uniform(size=N)
         mask[r <= p, t+1] = True
         observed_values[r <= p, t+1] = X_integer[r <= p, t+1]
@@ -140,7 +169,7 @@ def simulate_mask(
     return mask
 
 def simulate_synthetic(
-    X_float_unscaled,
+    M,
     integer_parameters,
     mask_parameters,
     path_dropout=None,
@@ -156,21 +185,20 @@ def simulate_synthetic(
     ----------
     X_synthetic : Simulated masked integer-valued dataset.
     """
-
-    X_integer = simulate_integer_from_float(
-        X_float_unscaled,
+    D = simulate_integer_from_float(
+        M,
         integer_parameters=integer_parameters,
         random_state=random_state
     )
 
     mask = simulate_mask(
-        X_integer,
+        D,
         mask_parameters=mask_parameters,
         path_dropout=path_dropout,
         random_state=random_state
     )
 
-    return X_integer*mask
+    return D*mask
 
 def summary(
     X,

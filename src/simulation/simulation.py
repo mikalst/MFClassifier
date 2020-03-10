@@ -9,7 +9,7 @@ def simulate_integer_from_float(
     X_float_unscaled,
     integer_parameters,
     return_float=False,
-    seed=None
+    random_state=None
 ):
     """Simulation of integer data from floats.
 
@@ -29,8 +29,8 @@ def simulate_integer_from_float(
     output_domain = integer_parameters['output_domain']
     kernel_parameter = integer_parameters['kernel_parameter']
 
-    if not(seed is None):
-        np.random.seed(seed)
+    if not(random_state is None):
+        np.random.seed(random_state)
 
     domain_max = np.max(output_domain)
     domain_min = np.min(output_domain)
@@ -78,7 +78,8 @@ def simulate_integer_from_float(
 def simulate_mask(
     X_integer,
     mask_parameters,
-    path_dropout=None
+    path_dropout=None,
+    random_state=None,
 ):
     """Simulation of a missing data mask.
 
@@ -106,6 +107,9 @@ def simulate_mask(
     mask = np.zeros_like(X_integer, dtype=np.bool)
     observed_values = np.zeros((N, T))
     individual_probs = np.empty((N, mask_transition_expectations.shape[0]))
+
+    if not(random_state is None):
+        np.random.seed(random_state)
 
     # Assign individual transition probabilities
     for i in range(mask_transition_expectations.shape[0]):
@@ -140,7 +144,7 @@ def simulate_synthetic(
     integer_parameters,
     mask_parameters,
     path_dropout=None,
-    seed=None
+    random_state=None
 ):
     """Simulation of a complete synthetic dataset.
 
@@ -155,13 +159,15 @@ def simulate_synthetic(
 
     X_integer = simulate_integer_from_float(
         X_float_unscaled,
-        integer_parameters=integer_parameters
+        integer_parameters=integer_parameters,
+        random_state=random_state
     )
 
     mask = simulate_mask(
         X_integer,
         mask_parameters=mask_parameters,
-        path_dropout=path_dropout
+        path_dropout=path_dropout,
+        random_state=random_state
     )
 
     return X_integer*mask

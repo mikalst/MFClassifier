@@ -90,23 +90,87 @@ def plot_sparsity(matrix1, matrix2):
 
     plt.subplot(1, 2, 1)
     plt.title("Synthetic masked")
-    out = plt.spy(matrix1, aspect="auto", markersize=0.06)
+    plt.spy(matrix1, aspect="auto", markersize=0.06)
 
     plt.subplot(1, 2, 2)
     plt.title("Original")
-    out = plt.spy(matrix2, aspect="auto", markersize=0.06)
+    plt.spy(matrix2, aspect="auto", markersize=0.06)
     plt.show()
+
+
+def plot_single(
+    matrix,
+    vrange=(1, 4),
+    plot_dims=(14, 6),
+    title=None,
+    output_file=None,
+    show_missing=None,
+    cmap=plt.get_cmap('viridis')
+):
+    cmap_copy = copy.copy(cmap)
+    # make locations under vmin translucent black
+    if show_missing:
+        cmap_copy.set_under('white', alpha=0.8)
+
+    if show_missing is None:
+        show_missing = False
+
+    if title is None:
+        title = 'matrix'
+
+    fig, ax = plt.subplots(
+            figsize=(plot_dims[0], plot_dims[1])
+    )
+    
+    if scipy.sparse.issparse(matrix):
+        matrix_show = matrix[np.linspace(0, matrix.shape[0]-1, 400, dtype=np.int)].todense()
+    else:
+        matrix_show = matrix[np.linspace(0, matrix.shape[0]-1, 400, dtype=np.int)]
+
+    out = ax.imshow(matrix_show, aspect="auto", 
+                        vmin=vrange[0], vmax=vrange[1], cmap=cmap_copy)
+
+    ax.set_ylabel("N")
+    ax.set_xlabel("T ({})".format(matrix.shape[1]))
+    ax.tick_params(axis='both', labelbottom=False, labelleft=False)
+    ax.set_ylabel("N ({})".format(matrix.shape[0]))
+    ax.title.set_text(title)
+
+    fig.subplots_adjust(right=0.88)
+    cbar_ax = fig.add_axes([0.9, 0.13, 0.015, 0.74])
+    fig.colorbar(out, cax=cbar_ax, orientation='vertical')
+
+    plt.subplots_adjust(wspace=0.12, hspace=0.10)
+
+    # Save output
+    if output_file is None:
+        plt.show()
+    else:
+        plt.savefig(output_file)
+        plt.show()
 
 
 def plot_visual(
         matrices, 
         vrange=(1, 4),
-        plot_dims=(14, 6),
+        plot_dims=(12, 7),
         titles=None,
         output_file=None,
         show_missing=None,
         cmap=plt.get_cmap('viridis')
-    ):
+):
+
+    if len(matrices) == 1:
+        plot_single(
+            matrices[0],
+            vrange,
+            plot_dims,
+            titles,
+            output_file,
+            show_missing,
+            cmap
+        )
+        return
 
     nonmasked_cmap = copy.copy(cmap)
     masked_cmap = copy.copy(cmap)

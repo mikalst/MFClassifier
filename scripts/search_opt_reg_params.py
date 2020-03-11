@@ -136,8 +136,72 @@ def gridsearch_jerome_data(
     THETA_EST=2.5,
     PARALLELIZE=True
 ):
-    # Not yet implemented
-    pass
+
+    # Prepare Jerome data
+    X_jerome = np.load(path_to_project_root +'data/jerome_processed/training_data.npy')
+
+    # Create data object
+    data_obj = TemporalDatasetKFold(X_jerome, prediction_rule='last_observed', n_splits=N_FOLDS)
+
+    # Prepare a model generator that yields a model for every index
+    def model_generator(idx):
+
+        l1_vals = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
+        l3_vals = np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)
+
+        return MatrixFactorization(
+            lambda0=1.0,
+            lambda1=l1_vals[idx // N_STEPS_L3],
+            lambda2=0.25,
+            lambda3=l3_vals[idx % N_STEPS_L3],
+            K=5,
+            domain_z=np.arange(1, 5),
+            total_iterations=2000,
+            tolerance=1e-4,
+            T=321
+        )
+
+    # Create indices that select a particular model
+    idc_parameter_select = np.arange(0, N_STEPS_L1*N_STEPS_L3)
+
+    if PARALLELIZE:
+        # Allocated empty results object
+        results = SharedMemoryResult(
+            N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
+            N_FOLDS=N_FOLDS,
+            N_STEPS_BIAS=N_STEPS_BIAS,
+            N_Z=4,
+            compute_recMSE=True
+        )
+
+        # Search in parallel over all possible models
+        search_parallelize(
+            data_obj,
+            model_generator,
+            idc_parameter_select,
+            results,
+            N_CPU=4
+        )
+    else:
+        # Allocated empty results object
+        results = Result(
+            N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
+            N_FOLDS=N_FOLDS,
+            N_STEPS_BIAS=N_STEPS_BIAS,
+            N_Z=4,
+            compute_recMSE=True
+        )
+        search(
+            data_obj,
+            model_generator,
+            idc_parameter_select,
+            results
+        )
+    
+    results.save(
+        path=path_to_project_root+'results/experiments_jerome_data/',
+        identifier=r"run{:d}.hdf5".format(int(time.time())),
+    )
 
 
 if __name__=='__main__':

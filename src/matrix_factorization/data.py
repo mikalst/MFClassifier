@@ -2,24 +2,31 @@ import numpy as np
 import sklearn.model_selection
 
 
-class TemporalDatasetTrain:
-    def __init__(self, data, ground_truth=None):
+class _TemporalDataset:
+    def __init__(self, data):
         self.X = np.array(data)
-        self.N = self.X.shape[0]
-        self.T = self.X.shape[1]
-
-        if not(ground_truth is None):
-            self.ground_truth = ground_truth
 
 
-class TemporalDatasetPredict(TemporalDatasetTrain):
+class TemporalDatasetTrain(_TemporalDataset):
+    def __init__(self, data, ground_truth=None):
+        super(TemporalDatasetTrain, self).__init__(data)
+        self.ground_truth = np.array(ground_truth)
+
+    @property
+    def X_train(self):
+        return self.X
+
+    @property
+    def ground_truth_train(self):
+        return self.ground_truth
+
+
+class TemporalDatasetPredict(_TemporalDataset):
     def __init__(self, data, ground_truth=None, prediction_rule='last_observed', prediction_window=4):
-        super(TemporalDatasetPredict, self).__init__(data, ground_truth)
+        super(TemporalDatasetPredict, self).__init__(data)
 
         self.prediction_rule = prediction_rule
         self.prediction_window = 4
-
-        self.valid_rows = np.ones(self.X.shape[0], dtype=np.bool)
 
         # Find time of last observed entry for all rows
         if self.prediction_rule == 'last_observed':
@@ -30,27 +37,37 @@ class TemporalDatasetPredict(TemporalDatasetTrain):
         elif self.prediction_rule == 'random':
             time_of_prediction = np.array([np.argmin(np.abs(np.random.randint(0, self.X.shape[1]) - np.argwhere(x != 0))) for x in self.X], dtype=np.int)
 
-        # Find rows that permit the specified prediction window
-        rows_satisfy_prediction_window = (time_of_prediction > prediction_window)
-        self.valid_rows[~rows_satisfy_prediction_window] = False
+        # Copy values to be predicted
+        y_true = np.copy(self.X[range(self.X.shape[0]), time_of_prediction])
 
-        # Find rows that have at least one observation before start of prediction window
-        rows_satisfy_one_observation = np.argmax(self.X != 0, axis=1) < time_of_prediction - prediction_window
-        self.valid_rows[~rows_satisfy_one_observation] = False
+        # Remove observations in or after prediction window
+        for i_row in range(self.X.shape[0]):
+            self.X[i_row, max(0, time_of_prediction[i_row] - prediction_window):] = 0
+
+        # Find rows that still contain observations
+        self.valid_rows = np.sum(self.X, axis=1) > 0
 
         # Remove all rows that don't satisfy the specified criteria
+        self.y = y_true[self.valid_rows]
         self.X = self.X[self.valid_rows]
         self.time_of_prediction = time_of_prediction[self.valid_rows]
+        if not(ground_truth is None):
+            self.ground_truth = ground_truth[self.valid_rows]
+        
+    @property
+    def X_pred_regressor(self):
+        return self.X
 
-        # Copy values to be predicted
-        self.y = np.copy(self.X[range(self.X.shape[0]), self.time_of_prediction])
+    @property
+    def y_true(self):
+        return self.y
 
-        # Overwrite value to be predicted and future values in the regressor dataset
-        for i_row in range(self.X.shape[0]):
-            self.X[i_row, self.time_of_prediction[i_row]:] = 0
+    @property
+    def ground_truth_pred(self):
+        return self.ground_truth
 
 
-class TemporalDatasetKFold(TemporalDatasetTrain):
+class TemporalDatasetKFold(_TemporalDataset):
     def __init__(self, data, ground_truth=None, prediction_rule='last_observed', prediction_window=4, n_splits=5):
 
         if not(ground_truth is None):

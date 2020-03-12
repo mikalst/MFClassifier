@@ -105,7 +105,7 @@ def gridsearch_synthetic_data(
             model_generator,
             idc_parameter_select,
             results,
-            N_CPU=4
+            N_CPU=multiprocessing.cpu_count()
         )
     else:
         # Allocated empty results object

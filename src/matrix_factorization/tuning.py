@@ -17,13 +17,15 @@ def search(
         model.fit(data_obj.X_train)
         model.score(data_obj, results, idx)
 
+        print("Running idx:", idx)
+
 
 def search_parallelize(
     data_obj,
     model_generator,
     idc_parameter_select,
     results,
-    N_CPU=4
+    N_CPU
 ):
 
     idc_per_cpu = np.array_split(idc_parameter_select, N_CPU)

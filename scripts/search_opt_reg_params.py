@@ -32,7 +32,7 @@ def gridsearch_synthetic_data(
     # Prepare synthetic data
     M = src.simulation.simulation.simulate_float_from_named_basis(
         'simple_peaks',
-        N=5000,
+        N=35000,
         T=321,
         K=5,
         random_state=42

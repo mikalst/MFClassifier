@@ -6,7 +6,7 @@ import tqdm.autonotebook as tqdm
 sys.path.append('../')
 
 from src.utils.special_matrices import finite_difference_matrix
-from src.matrix_factorization.data import TemporalDatasetPredict, TemporalDatasetKFold
+from src.data import TemporalDatasetPredict, TemporalDatasetKFold
 
 
 class MatrixFactorization:

@@ -248,9 +248,6 @@ class MatrixFactorization:
             return domain_e[np.argmax(p_e*bias_e, axis=1)]
 
     def _score_single(self, data_obj, output_obj, idx_output):
-
-        print("Index {}".format(idx_output))
-
         # Store input parameters
         output_obj['lambda0'][idx_output] = self.lambda0
         output_obj['lambda1'][idx_output] = self.lambda1

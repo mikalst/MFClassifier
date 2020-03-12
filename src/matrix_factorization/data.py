@@ -38,7 +38,7 @@ class TemporalDatasetPredict(_TemporalDataset):
             time_of_prediction = np.array([np.argmin(np.abs(np.random.randint(0, self.X.shape[1]) - np.argwhere(x != 0))) for x in self.X], dtype=np.int)
 
         # Copy values to be predicted
-        y_true = np.copy(self.X[range(self.X.shape[0]), time_of_prediction])
+        y_pred = np.copy(self.X[range(self.X.shape[0]), time_of_prediction])
 
         # Remove observations in or after prediction window
         for i_row in range(self.X.shape[0]):
@@ -48,7 +48,7 @@ class TemporalDatasetPredict(_TemporalDataset):
         self.valid_rows = np.sum(self.X, axis=1) > 0
 
         # Remove all rows that don't satisfy the specified criteria
-        self.y = y_true[self.valid_rows]
+        self.y = y_pred[self.valid_rows]
         self.X = self.X[self.valid_rows]
         self.time_of_prediction = time_of_prediction[self.valid_rows]
         if not(ground_truth is None):
@@ -59,7 +59,7 @@ class TemporalDatasetPredict(_TemporalDataset):
         return self.X
 
     @property
-    def y_true(self):
+    def y_pred(self):
         return self.y
 
     @property

@@ -4,7 +4,7 @@ import tqdm.autonotebook as tqdm
 import multiprocessing
 import numpy as np
 
-path_to_project_root = '../'
+path_to_project_root = sys.path[0]+'/../'
 sys.path.append(path_to_project_root)
 
 import src.simulation.simulation

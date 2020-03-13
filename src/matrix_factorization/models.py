@@ -3,10 +3,8 @@ import sklearn.metrics
 import sys
 import tqdm.autonotebook as tqdm
 
-sys.path.append('../')
-
-from src.utils.special_matrices import finite_difference_matrix
-from src.data import TemporalDatasetPredict, TemporalDatasetKFold
+from ..data import TemporalDatasetPredict, TemporalDatasetKFold
+from ..utils.special_matrices import finite_difference_matrix
 
 
 class MatrixFactorization:
@@ -272,6 +270,8 @@ class MatrixFactorization:
             data_obj.time_of_prediction,
         )
 
+        def rule(x): return 0 if x == 1 else 1
+
         N_STEPS_BIAS = output_obj.attrs['N_STEPS_BIAS']
         for i_bias, b in enumerate(np.linspace(0, 1, N_STEPS_BIAS)):
 
@@ -279,13 +279,15 @@ class MatrixFactorization:
                 data_obj.X_pred_regressor,
                 data_obj.time_of_prediction,
                 p_z_precomputed=posterior_probability,
-                rule_z_to_e=lambda x: 0 if x == 1 else 1,
+                rule_z_to_e=rule,
                 domain_e=np.arange(0, 2),
                 bias_e=np.array([1-b, b])
             )
 
             cm = sklearn.metrics.confusion_matrix(
-                data_obj.y_pred > 1, predicted_e)
+                np.array(list(map(rule, data_obj.y_true))),
+                predicted_e
+            )
             output_obj['sensitivity_with_bias'][N_STEPS_BIAS *
                                                 idx_output + i_bias] = cm[1, 1] / np.sum(cm[1, :])
             output_obj['specificity_with_bias'][N_STEPS_BIAS *
@@ -300,7 +302,7 @@ class MatrixFactorization:
 
         N_Z = output_obj.attrs['N_Z']
         output_obj['cms'][(N_Z**2)*idx_output:(N_Z**2)*idx_output+(N_Z**2)] = (sklearn.metrics.confusion_matrix(
-            data_obj.y_pred, predicted_integers, labels=range(1, N_Z+1))).flatten()
+            data_obj.y_true, predicted_integers, labels=range(1, N_Z+1))).flatten()
 
     def score(self, data_obj, output_obj, idx_output=0):
 

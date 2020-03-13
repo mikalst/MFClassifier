@@ -1,6 +1,5 @@
 import sys
 import time
-import tqdm.autonotebook as tqdm
 import multiprocessing
 import numpy as np
 
@@ -8,10 +7,10 @@ path_to_project_root = sys.path[0]+'/../'
 sys.path.append(path_to_project_root)
 
 import src.simulation
-import src.utils.special_matrices
+import src.utils
 from src.matrix_factorization.models import MatrixFactorization
-from src.matrix_factorization.data import TemporalDatasetKFold
-from src.matrix_factorization.data import TemporalDatasetPredict
+from src.data import TemporalDatasetKFold
+from src.data import TemporalDatasetPredict
 from src.matrix_factorization.tuning import Result, SharedMemoryResult
 from src.matrix_factorization.tuning import search, search_parallelize
 

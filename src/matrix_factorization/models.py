@@ -81,8 +81,8 @@ class MatrixFactorization:
 
         self.iteration = 0
 
-        # Train
-        self.train()
+        # __train
+        self.__train()
 
     def resetV(self):
         self.V = np.ones((self.T, self.K)) * \
@@ -150,43 +150,43 @@ class MatrixFactorization:
         self.iteration += 1
         return False
 
-    def train(self):
+    def __train(self):
         while True:
             converged = next(self)
             if converged:
                 break
 
-    def _loglikelihood(self, Y_pred):
-        r"""For each row y in Y_pred, calculate the loglikelihood of y having originated
+    def _loglikelihood(self, X_pred):
+        r"""For each row y in X_pred, calculate the loglikelihood of y having originated
         from the reconstructed continuous profile of all the patients in the training set.
         """
         M_train = self.U @ self.V.T
 
         N_1 = M_train.shape[0]
-        N_2 = Y_pred.shape[0]
+        N_2 = X_pred.shape[0]
 
         logL = np.ones((N_2, N_1))
 
         for i in range(N_2):
-            row_nonzero_cols = Y_pred[i] != 0
-            eta_i = (Y_pred[i, row_nonzero_cols])[None, :] - M_train[
+            row_nonzero_cols = X_pred[i] != 0
+            eta_i = (X_pred[i, row_nonzero_cols])[None, :] - M_train[
                 :, row_nonzero_cols
             ]
             logL[i] = np.sum(-self.theta*np.power(eta_i, 2), axis=1)
 
         return logL
 
-    def predict_proba(self, Y_pred, t):
-        r"""For each row y in Y_pred, calculate the predict_proba probability
+    def predict_proba(self, X_pred, t):
+        r"""For each row y in X_pred, calculate the predict_proba probability
         of each integer value in the output domain for a future
         time t.
         """
-        logL = self._loglikelihood(Y_pred)
+        logL = self._loglikelihood(X_pred)
         trainM = self.U @ self.V.T
 
-        p_z = np.empty((Y_pred.shape[0], self.domain_z.shape[0]))
+        p_z = np.empty((X_pred.shape[0], self.domain_z.shape[0]))
 
-        for i in range(Y_pred.shape[0]):
+        for i in range(X_pred.shape[0]):
             p_z[i] = np.exp(logL[i]) @ np.exp(-self.theta *
                                               (trainM[:, t[i], None] - self.domain_z)**2)
 
@@ -195,17 +195,17 @@ class MatrixFactorization:
 
         return p_z_normalized
 
-    def predict_proba_event(self, Y_pred, t, rule_z_to_e, domain_e, p_z_precomputed=None):
-        r"""For each row y in Y_pred, calculate the predict_proba probability
+    def predict_proba_event(self, X_pred, t, rule_z_to_e, domain_e, p_z_precomputed=None):
+        r"""For each row y in X_pred, calculate the predict_proba probability
         of each rule outcome e by mapping rule over the integer values in the
         domain and summing over all integer that result in rule outcome e.
         """
         if p_z_precomputed is None:
-            p_z = self.predict_proba(Y_pred, t)
+            p_z = self.predict_proba(X_pred, t)
         else:
             p_z = p_z_precomputed
 
-        p_e = np.empty((Y_pred.shape[0], domain_e.shape[0]))
+        p_e = np.empty((X_pred.shape[0], domain_e.shape[0]))
 
         for i_event, e in enumerate(domain_e):
 
@@ -217,12 +217,12 @@ class MatrixFactorization:
 
         return p_e
 
-    def predict(self, Y_pred, t, bias_z=None, p_z_precomputed=None):
-        r"""For each row y in Y_pred, calculate the highest predict_proba
+    def predict(self, X_pred, t, bias_z=None, p_z_precomputed=None):
+        r"""For each row y in X_pred, calculate the highest predict_proba
         probability integer value for a future time t.
         """
         if p_z_precomputed is None:
-            p_z = self.predict_proba(Y_pred, t)
+            p_z = self.predict_proba(X_pred, t)
         else:
             p_z = p_z_precomputed
 
@@ -231,13 +231,13 @@ class MatrixFactorization:
         else:
             return self.domain_z[np.argmax(p_z*bias_z, axis=1)]
 
-    def predict_event(self, y_pred, t, rule_z_to_e, domain_e, p_z_precomputed=None, bias_e=None, p_e_precomputed=None):
-        r"""For each row y in Y_pred, calculate the highest predict_proba
+    def predict_event(self, X_pred, t, rule_z_to_e, domain_e, p_z_precomputed=None, bias_e=None, p_e_precomputed=None):
+        r"""For each row y in X_pred, calculate the highest predict_proba
         probability rule outcome e for a future time t.
         """
         if p_e_precomputed is None:
             p_e = self.predict_proba_event(
-                y_pred, t, rule_z_to_e, domain_e, p_z_precomputed
+                X_pred, t, rule_z_to_e, domain_e, p_z_precomputed
             )
         else:
             p_e = p_e_precomputed
@@ -360,7 +360,7 @@ class MatrixFactorizationTesting(MatrixFactorization):
 
         return (res1 + res2 + res3).reshape(self.T * self.K)
 
-    def train(self):
+    def __train(self):
         with tqdm.tqdm(total=self.total_iterations, file=sys.stdout) as pbar:
             while True:
                 converged = next(self)

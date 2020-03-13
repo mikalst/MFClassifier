@@ -5,7 +5,7 @@ Algorithms for simulating matrices that exhibit the same characteristics as Norw
 import numpy as np
 
 
-def simulate_float_from_named_basis(basis_name, N, T, K, domain=[1, 4], random_state=None):
+def simulate_float_from_named_basis(basis_name, N=38000, T=321, K=5, domain=[1, 4], random_state=42):
 
     if not(random_state is None):
         np.random.seed(random_state)

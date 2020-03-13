@@ -7,7 +7,7 @@ import numpy as np
 path_to_project_root = sys.path[0]+'/../'
 sys.path.append(path_to_project_root)
 
-import src.simulation.simulation
+import src.simulation
 import src.utils.special_matrices
 from src.matrix_factorization.models import MatrixFactorization
 from src.matrix_factorization.data import TemporalDatasetKFold
@@ -30,7 +30,7 @@ def gridsearch_synthetic_data(
     PARALLELIZE=False
 ):
     # Prepare synthetic data
-    M = src.simulation.simulation.simulate_float_from_named_basis(
+    M = src.simulation.simulate_float_from_named_basis(
         'simple_peaks',
         N=35000,
         T=321,
@@ -51,13 +51,13 @@ def gridsearch_synthetic_data(
         'mask_level': 0.6
     }
 
-    D = src.simulation.simulation.simulate_integer_from_float(
+    D = src.simulation.simulate_integer_from_float(
         M,
         integer_parameters=parameters_simulate_integer,
         random_state=42
     )
 
-    mask = src.simulation.simulation.simulate_mask(
+    mask = src.simulation.simulate_mask(
         D,
         mask_parameters=parameters_simulate_mask,
         random_state=42

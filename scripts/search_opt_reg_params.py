@@ -4,10 +4,10 @@ import tqdm.autonotebook as tqdm
 import multiprocessing
 import numpy as np
 
-path_to_project_root = '../'
+path_to_project_root = sys.path[0]+'/../'
 sys.path.append(path_to_project_root)
 
-import src.simulation.simulation
+import src.simulation
 import src.utils.special_matrices
 from src.matrix_factorization.models import MatrixFactorization
 from src.matrix_factorization.data import TemporalDatasetKFold
@@ -30,37 +30,43 @@ def gridsearch_synthetic_data(
     PARALLELIZE=False
 ):
     # Prepare synthetic data
-    X_reals = np.load(path_to_project_root +'data/synthetic/X_train_reals.npy')
+    M = src.simulation.simulate_float_from_named_basis(
+        'simple_peaks',
+        N=35000,
+        T=321,
+        K=5,
+        random_state=42
+    )
 
     parameters_simulate_integer = {
         'output_domain': np.arange(1, 5),
         'kernel_parameter': THETA_EST,
     }
 
-    tp = np.array([0.05, 0.15, 0.40, 0.60, 0.20])
+    p = np.array([0.05, 0.15, 0.40, 0.60, 0.20])
 
     parameters_simulate_mask = {
-        'mask_transition_expectations': tp,
-        'mask_transition_variances': 1e9*np.ones(5),
+        'mask_screening_proba': p,
         'memory_length': 10,
         'mask_level': 0.6
     }
 
-    X_integers = src.simulation.simulation.simulate_integer_from_float(
-        X_reals,
+    D = src.simulation.simulate_integer_from_float(
+        M,
         integer_parameters=parameters_simulate_integer,
-        seed=43
+        random_state=42
     )
 
-    mask = src.simulation.simulation.simulate_mask(
-        X_integers,
-        mask_parameters=parameters_simulate_mask
+    mask = src.simulation.simulate_mask(
+        D,
+        mask_parameters=parameters_simulate_mask,
+        random_state=42
     )
 
-    X_masked = X_integers*mask
+    X = D*mask
     
     # Create data object
-    data_obj = TemporalDatasetKFold(X_masked, ground_truth=X_reals, prediction_rule='last_observed', n_splits=N_FOLDS)
+    data_obj = TemporalDatasetKFold(X, ground_truth=M, prediction_rule='last_observed', n_splits=N_FOLDS)
 
     # Prepare a model generator that yields a model for every index
     def model_generator(idx):
@@ -99,7 +105,7 @@ def gridsearch_synthetic_data(
             model_generator,
             idc_parameter_select,
             results,
-            N_CPU=4
+            N_CPU=multiprocessing.cpu_count()
         )
     else:
         # Allocated empty results object
@@ -205,7 +211,8 @@ def gridsearch_jerome_data(
 
 
 if __name__=='__main__':
-    
+    t0 = time.time()
+
     gridsearch_synthetic_data(
         N_FOLDS=int(sys.argv[1]),
         N_STEPS_L1=int(sys.argv[2]),
@@ -219,3 +226,5 @@ if __name__=='__main__':
         THETA_EST=float(sys.argv[10]),
         PARALLELIZE=eval(sys.argv[11])
     )
+
+    print("Time spent: ", time.time() - t0)

@@ -10,8 +10,8 @@ sys.path.append(path_to_project_root)
 import src.simulation
 import src.utils.special_matrices
 from src.matrix_factorization.models import MatrixFactorization
-from src.matrix_factorization.data import TemporalDatasetKFold
-from src.matrix_factorization.data import TemporalDatasetPredict
+from src.data import TemporalDatasetKFold
+from src.data import TemporalDatasetPredict
 from src.matrix_factorization.tuning import Result, SharedMemoryResult
 from src.matrix_factorization.tuning import search, search_parallelize
 

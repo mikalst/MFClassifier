@@ -372,7 +372,7 @@ class TemporalMCClassifier(ClassifierMixin):
             return np.ones_like(proba_bin)*(proba_bin >= 1 - bias_bin)
 
 
-class TemporalMClassifierTesting(TemporalMClassifier):
+class TemporalMClassifierTesting(TemporalMCClassifier):
     """An extension of the MatrixFactorization class. Used for testing.
     """
 

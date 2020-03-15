@@ -1,13 +1,16 @@
-import numpy as np
-import sklearn.metrics
 import sys
+import copy
+import numpy as np
+import hashlib
+import sklearn.metrics
+from sklearn.base import ClassifierMixin
 import tqdm.autonotebook as tqdm
 
 from ..data import TemporalDatasetPredict, TemporalDatasetKFold
 from ..utils.special_matrices import finite_difference_matrix
 
 
-class MatrixFactorization:
+class TemporalMCClassifier(ClassifierMixin):
     r"""A class for solving the matrix completion problem using a regularized
     Frobenius norm approach. This yields (U, V) that minimize the cost
 
@@ -25,6 +28,9 @@ class MatrixFactorization:
         K=5,
         theta=2.5,
         domain_z=np.arange(1, 10),
+        z_to_event_mapping=None,
+        domain_event=None,
+        z_to_binary_mapping=None,
         T=100,
         R=None,
         J=None,
@@ -39,8 +45,14 @@ class MatrixFactorization:
         self.lambda3 = lambda3
 
         self.K = K  # Rank
-        self.domain_z = domain_z  # Domain of integer values
         self.theta = theta  # Parameter in the gaussian kernel
+        self.domain_z = domain_z  # Domain of integer values
+
+        self.z_to_event_mapping = z_to_event_mapping # Mapping to secondary classifier
+        self.domain_event = domain_event # Domain of secondary classifier
+
+        self.z_to_binary_mapping = z_to_binary_mapping
+
         self.T = T  # Time granularity
 
         if (R is None):
@@ -61,26 +73,10 @@ class MatrixFactorization:
         self.L2, self.Q2 = np.linalg.eigh(
             (self.lambda3 / self.lambda0) * self.RTCTCR)
 
-    def fit(self, Y):
-        self.Y = Y
-
-        self.nonzero_rows, self.nonzero_cols = np.nonzero(self.Y)
-        self.N = self.Y.shape[0]
-
-        # Initialize U
-        self.U = np.ones((self.N, self.K))
-        self.U_old = np.zeros((self.N, self.K))
-        # Initialize V
-        self.V = np.ones((self.T, self.K)) * \
-            np.mean(self.Y[self.nonzero_rows, self.nonzero_cols])
-        self.V_old = np.zeros((self.T, self.K))
-        # Initialize S
-        self.S = self.Y.copy()
-
-        self.iteration = 0
-
-        # __train
-        self.__train()
+        # Initialize prediction probabilities
+        self.__proba_z_precomputed = None
+        self.__ds_X_hash = None
+        self.__ds_t_hash = None
 
     def resetV(self):
         self.V = np.ones((self.T, self.K)) * \
@@ -128,9 +124,6 @@ class MatrixFactorization:
         self.S = self._solve3()
         return
 
-    def __iter__(self):
-        return self
-
     def __next__(self):
         if self.iteration % 50 == 0:
             self.U_old = np.copy(self.U)
@@ -154,6 +147,103 @@ class MatrixFactorization:
             if converged:
                 break
 
+    def set_params(
+        self,
+        lambda0=1.,
+        lambda1=0.,
+        lambda2=0.,
+        lambda3=0.,
+        K=5,
+        theta=2.5,
+        domain_z=np.arange(1, 10),
+        z_to_e_mapping=None,
+        domain_e=None,
+        T=100,
+        R=None,
+        J=None,
+        C=None,
+        total_iterations=1000,
+        tolerance=1e-4
+    ):
+        # Regularization parameters
+        self.lambda0 = lambda0
+        self.lambda1 = lambda1
+        self.lambda2 = lambda2
+        self.lambda3 = lambda3
+
+        self.K = K  # Rank
+        self.theta = theta  # Parameter in the gaussian kernel
+        self.domain_z = domain_z  # Domain of integer values
+
+        self.z_to_e_mapping = z_to_e_mapping # Mapping to secondary classifier
+        self.domain_e = domain_e # Domain of secondary classifier
+
+        self.T = T  # Time granularity
+
+        if (R is None):
+            self.R = finite_difference_matrix(T)
+
+        if (J is None):
+            self.J = np.zeros((T, K))
+
+        if (C is None):
+            self.C = np.identity(T)
+
+        self.iteration = 0
+        self.total_iterations = total_iterations
+        self.tolerance = tolerance
+
+        # Code optimization: static variables are computed and stored
+        self.RTCTCR = (self.C @ self.R).T@(self.C@self.R)
+        self.L2, self.Q2 = np.linalg.eigh(
+            (self.lambda3 / self.lambda0) * self.RTCTCR)
+
+    def get_params(self, deep=True):
+        # Regularization parameters
+        params = {
+            'lambda0': self.lambda0,
+            'lambda1': self.lambda1,
+            'lambda2': self.lambda2,
+            'lambda3': self.lambda3,
+            'K': self.K,
+            'theta': self.theta,
+            'domain_z': self.domain_z,
+            'z_to_e_mapping': self.z_to_e_mapping,
+            'domain_e': self.domain_e,
+            'T': self.T,
+            'R': self.R,
+            'J': self.J,
+            'C': self.C,
+            'total_iterations': self.total_iterations,
+            'tolerance': self.tolerance
+        }
+        if deep:
+            for key in params.keys():
+                params[key] = copy.deepcopy(params[key])
+
+        return params
+
+    def fit(self, Y):
+        self.Y = Y
+
+        self.nonzero_rows, self.nonzero_cols = np.nonzero(self.Y)
+        self.N = self.Y.shape[0]
+
+        # Initialize U
+        self.U = np.ones((self.N, self.K))
+        self.U_old = np.zeros((self.N, self.K))
+        # Initialize V
+        self.V = np.ones((self.T, self.K)) * \
+            np.mean(self.Y[self.nonzero_rows, self.nonzero_cols])
+        self.V_old = np.zeros((self.T, self.K))
+        # Initialize S
+        self.S = self.Y.copy()
+
+        self.iteration = 0
+
+        # __train
+        self.__train()
+
     def _loglikelihood(self, X_pred):
         r"""For each row y in X_pred, calculate the loglikelihood of y having originated
         from the reconstructed continuous profile of all the patients in the training set.
@@ -174,157 +264,115 @@ class MatrixFactorization:
 
         return logL
 
-    def predict_proba(self, X_pred, t):
+    def __is_match_ds_hash(self, X_and_t):
+        X, t = X_and_t
+
+        if (self.__ds_X_hash is None) or (self.__ds_t_hash is None):
+            return False
+        elif (hashlib.sha1(X).hexdigest() == self.__ds_X_hash) and (hashlib.sha1(t).hexdigest() == self.__ds_t_hash):
+            return True
+        return False
+
+    def __store_ds_hash(self, X_and_t):
+        X, t = X_and_t
+        self.__ds_X_hash = hashlib.sha1(X).hexdigest()
+        self.__ds_t_hash = hashlib.sha1(t).hexdigest()
+
+    def predict_proba(self, X_and_t):
         r"""For each row y in X_pred, calculate the predict_proba probability
         of each integer value in the output domain for a future
         time t.
         """
+        # If evaluating several scoring methods subsequently, 
+        #  significant computational time can be saved by storing
+        #  the class probabilities
+        if self.__is_match_ds_hash(X_and_t):
+            return self.__proba_z_precomputed
+
+        X_pred, t = X_and_t
+
         logL = self._loglikelihood(X_pred)
         trainM = self.U @ self.V.T
 
-        p_z = np.empty((X_pred.shape[0], self.domain_z.shape[0]))
+        proba_z = np.empty((X_pred.shape[0], self.domain_z.shape[0]))
 
         for i in range(X_pred.shape[0]):
-            p_z[i] = np.exp(logL[i]) @ np.exp(-self.theta *
+            proba_z[i] = np.exp(logL[i]) @ np.exp(-self.theta *
                                               (trainM[:, t[i], None] - self.domain_z)**2)
 
         # Normalize
-        p_z_normalized = p_z / (np.sum(p_z, axis=1))[:, None]
+        proba_z_normalized = proba_z / (np.sum(proba_z, axis=1))[:, None]
 
-        return p_z_normalized
+        # Store probabilities
+        self.__proba_z_precomputed = proba_z_normalized
+        self.__store_ds_hash(X_and_t)
 
-    def predict_proba_event(self, X_pred, t, rule_z_to_e, domain_e, p_z_precomputed=None):
+        return proba_z_normalized
+
+    def predict_proba_event(self, X_and_t):
         r"""For each row y in X_pred, calculate the predict_proba probability
         of each rule outcome e by mapping rule over the integer values in the
         domain and summing over all integer that result in rule outcome e.
         """
-        if p_z_precomputed is None:
-            p_z = self.predict_proba(X_pred, t)
-        else:
-            p_z = p_z_precomputed
+        proba_z = self.predict_proba(X_and_t)
 
-        p_e = np.empty((X_pred.shape[0], domain_e.shape[0]))
+        proba_event = np.empty((proba_z.shape[0], self.domain_e.shape[0]))
 
-        for i_event, e in enumerate(domain_e):
+        for i_event, e in enumerate(self.domain_e):
 
             values_of_z_where_e_happens = np.argwhere(
-                [rule_z_to_e(z) for z in self.domain_z] == e)
+                [self.z_to_e_mapping(z) for z in self.domain_z] == e)
 
-            p_e[:, i_event] = (
-                np.sum(p_z[:, values_of_z_where_e_happens], axis=1)).flatten()
+            proba_event[:, i_event] = (
+                np.sum(proba_z[:, values_of_z_where_e_happens], axis=1)).flatten()
 
-        return p_e
+        return proba_event
 
-    def predict(self, X_pred, t, bias_z=None, p_z_precomputed=None):
+    def predict_proba_binary(self, X_and_t):
+        # If evaluating several scoring methods subsequently, 
+        #  significant computational time can be saved by storing
+        #  the class probabilities
+        proba_z = self.predict_proba(X_and_t)
+
+        values_of_z_where_true = [self.z_to_binary_mapping(z) for z in self.domain_z] 
+        proba_bin = np.sum(proba_z[:, values_of_z_where_true], axis=1).flatten()
+
+        return proba_bin
+
+    def predict(self, X_and_t, bias_z=None):
         r"""For each row y in X_pred, calculate the highest predict_proba
         probability integer value for a future time t.
         """
-        if p_z_precomputed is None:
-            p_z = self.predict_proba(X_pred, t)
-        else:
-            p_z = p_z_precomputed
+        proba_z = self.predict_proba(X_and_t)
 
         if bias_z is None:
-            return self.domain_z[np.argmax(p_z, axis=1)]
+            return self.domain_z[np.argmax(proba_z, axis=1)]
         else:
-            return self.domain_z[np.argmax(p_z*bias_z, axis=1)]
+            return self.domain_z[np.argmax(proba_z*bias_z, axis=1)]
 
-    def predict_event(self, X_pred, t, rule_z_to_e, domain_e, p_z_precomputed=None, bias_e=None, p_e_precomputed=None):
+    def predict_event(self, X_and_t, bias_e=None):
         r"""For each row y in X_pred, calculate the highest predict_proba
         probability rule outcome e for a future time t.
         """
-        if p_e_precomputed is None:
-            p_e = self.predict_proba_event(
-                X_pred, t, rule_z_to_e, domain_e, p_z_precomputed
-            )
-        else:
-            p_e = p_e_precomputed
+        proba_e = self.predict_proba_event(X_and_t)
 
         if bias_e is None:
-            return domain_e[np.argmax(p_e, axis=1)]
+            return self.domain_e[np.argmax(proba_e, axis=1)]
         else:
-            return domain_e[np.argmax(p_e*bias_e, axis=1)]
+            return self.domain_e[np.argmax(proba_e*bias_e, axis=1)]
 
-    def _score_single(self, data_obj, output_obj, idx_output):
-        # Store input parameters
-        output_obj['lambda0'][idx_output] = self.lambda0
-        output_obj['lambda1'][idx_output] = self.lambda1
-        output_obj['lambda2'][idx_output] = self.lambda2
-        output_obj['lambda3'][idx_output] = self.lambda3
-        output_obj['K'][idx_output] = self.K
-        output_obj['theta'][idx_output] = self.theta
-
-        # Store scoring measures
-        if not(data_obj.ground_truth is None):
-            output_obj['recMSE'][idx_output] = np.mean(
-                ((data_obj.ground_truth_train -
-                  self.U@(self.V.T))[data_obj.X_train == 0])**2
-            )
-
-        output_obj['predSSE'][idx_output] = np.mean(
-            ((data_obj.X_train - self.U@self.V.T)[data_obj.X_train != 0])**2
-        )
-
-        posterior_probability = self.predict_proba(
-            data_obj.X_pred_regressor,
-            data_obj.time_of_prediction,
-        )
-
-        def rule(x): return 0 if x == 1 else 1
-
-        N_STEPS_BIAS = output_obj.attrs['N_STEPS_BIAS']
-        for i_bias, b in enumerate(np.linspace(0, 1, N_STEPS_BIAS)):
-
-            predicted_e = self.predict_event(
-                data_obj.X_pred_regressor,
-                data_obj.time_of_prediction,
-                p_z_precomputed=posterior_probability,
-                rule_z_to_e=rule,
-                domain_e=np.arange(0, 2),
-                bias_e=np.array([1-b, b])
-            )
-
-            cm = sklearn.metrics.confusion_matrix(
-                np.array(list(map(rule, data_obj.y_true))),
-                predicted_e
-            )
-            output_obj['sensitivity_with_bias'][N_STEPS_BIAS *
-                                                idx_output + i_bias] = cm[1, 1] / np.sum(cm[1, :])
-            output_obj['specificity_with_bias'][N_STEPS_BIAS *
-                                                idx_output + i_bias] = cm[0, 0] / np.sum(cm[0, :])
-
-        # Classification full
-        predicted_integers = self.predict(
-            data_obj.X_pred_regressor,
-            data_obj.time_of_prediction,
-            p_z_precomputed=posterior_probability
-        )
-
-        N_Z = output_obj.attrs['N_Z']
-        output_obj['cms'][(N_Z**2)*idx_output:(N_Z**2)*idx_output+(N_Z**2)] = (sklearn.metrics.confusion_matrix(
-            data_obj.y_true, predicted_integers, labels=range(1, N_Z+1))).flatten()
-
-    def score(self, data_obj, output_obj, idx_output=0):
-
-        if isinstance(data_obj, TemporalDatasetKFold):
-            N_FOLDS = data_obj.n_splits
-            for i_fold in range(N_FOLDS):
-                data_obj.i_fold = i_fold
-                self.fit(data_obj.X_train)
-                self._score_single(
-                    data_obj,
-                    output_obj,
-                    N_FOLDS*idx_output+i_fold
-                )
-        elif isinstance(data_obj, TemporalDatasetPredict):
-            self._score_single(
-                data_obj.X,
-                output_obj,
-                idx_output
-            )
+    def predict_binary(self, X_and_t, bias_bin=None):
+        r"""For each row y in X_pred, calculate the highest probability
+        binary outcome for a future time t.
+        """
+        proba_bin = self.predict_proba_binary(X_and_t)
+        if bias_bin is None:
+            return np.ones_like(proba_bin)*(proba_bin >= 0.5)
+        else:
+            return np.ones_like(proba_bin)*(proba_bin >= 1 - bias_bin)
 
 
-class MatrixFactorizationTesting(MatrixFactorization):
+class TemporalMClassifierTesting(TemporalMClassifier):
     """An extension of the MatrixFactorization class. Used for testing.
     """
 
@@ -369,46 +417,3 @@ class MatrixFactorizationTesting(MatrixFactorization):
                 pbar.update(1)
                 if converged:
                     break
-
-
-class MatrixFactorizationWeighted(MatrixFactorization):
-    """Instead solves the inverse problem
-    || (S - U V^T)W^T ||_F^2 + l1 || U ||_F^2 + l2 || V ||_F^2 + l3 || C R V||_F^2
-    This class is far slower, around 6-7 times the running time.
-    """
-
-    def __init__(self, args):
-        super(MatrixFactorizationWeighted, self).__init__(args)
-        self.W = args["W"]
-
-    def _solve1(self):
-        U = (
-            np.linalg.solve(
-                self.V.T@self.W.T@self.W@self.V +
-                (self.lambda1 / self.lambda0) * np.identity(self.K),
-                self.V.T @ self.W.T @ self.W @ self.S.T,
-            )
-        ).T
-
-        return U
-
-    def _solve2(self):
-
-        A = self.W.T@self.W
-        B = self.U.T@self.U
-
-        P0 = np.kron(A, B)
-        P1 = np.kron(self.lambda2*np.identity(self.T), np.identity(self.K))
-        P2 = np.kron(self.lambda3*self.R.T @ self.C.T @
-                     self.C @ self.R, np.identity(self.K))
-
-        V = (np.linalg.solve((P0 + P1 + P2), (self.W.T @ self.W @
-                                              self.S.T @ self.U).flatten())).reshape(self.T, self.K)
-
-        return V
-
-    def _solve_inner(self):
-        self.U = self._solve1()
-        self.V = self._solve2()
-        self.S = self._solve3()
-        return

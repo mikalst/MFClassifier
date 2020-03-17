@@ -4,48 +4,6 @@ from multiprocessing import Array
 import h5py
 
 
-def search(
-    data_obj,
-    model_generator,
-    idc_parameter_select,
-    results
-):
-
-    for idx in idc_parameter_select:
-    
-        model = model_generator(idx)
-        model.fit(data_obj.X_train)
-        model.score(data_obj, results, idx)
-
-        print("Running idx:", idx)
-
-
-def search_parallelize(
-    data_obj,
-    model_generator,
-    idc_parameter_select,
-    results,
-    N_CPU
-):
-
-    idc_per_cpu = np.array_split(idc_parameter_select, N_CPU)
-
-    workers = []
-    for i_cpu in range(N_CPU):
-        workers.append(multiprocessing.Process(target=search, args=
-                (
-                    data_obj,
-                    model_generator,
-                    idc_per_cpu[i_cpu],
-                    results
-                )
-            )
-        )
-
-    for worker in workers:
-        worker.start()
-    for worker in workers:
-        worker.join()
 
 
 class Result(dict):
@@ -129,3 +87,47 @@ class SharedMemoryResult(Result):
 
         for key in self.keys():
             self[key] = Array('d', (self[key]))
+
+
+def search(
+    data_obj,
+    model_generator,
+    idc_parameter_select,
+    results
+):
+
+    for idx in idc_parameter_select:
+    
+        model = model_generator(idx)
+        model.fit(data_obj.X_train)
+        model.score(data_obj, results, idx)
+
+        print("Running idx:", idx)
+
+
+def search_parallelize(
+    data_obj,
+    model_generator,
+    idc_parameter_select,
+    results,
+    N_CPU
+):
+
+    idc_per_cpu = np.array_split(idc_parameter_select, N_CPU)
+
+    workers = []
+    for i_cpu in range(N_CPU):
+        workers.append(multiprocessing.Process(target=search, args=
+                (
+                    data_obj,
+                    model_generator,
+                    idc_per_cpu[i_cpu],
+                    results
+                )
+            )
+        )
+
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join()

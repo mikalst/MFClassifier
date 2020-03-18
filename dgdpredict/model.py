@@ -121,13 +121,14 @@ class TemporalMCClassifier(ClassifierMixin):
 
         self.T = T  # Time granularity
 
-        if (R is None):
+        self.R = R
+        if (self.R is None):
             self.R = finite_difference_matrix(T)
-
-        if (J is None):
-            self.J = np.zeros((T, K))
-
-        if (C is None):
+        self.J = J
+        if (self.J is None):
+            self.J = np.zeros((T, K))   
+        self.C = C
+        if (self.C is None):
             self.C = np.identity(T)
 
         self.n_iter_ = 0

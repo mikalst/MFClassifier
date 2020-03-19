@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import multiprocessing
@@ -6,14 +7,17 @@ import numpy as np
 path_to_project_root = sys.path[0]+'/../'
 sys.path.append(path_to_project_root)
 
-import src.simulation
-import src.utils
-from src.matrix_factorization.models import MatrixFactorization
-from src.data import TemporalDatasetKFold
-from src.data import TemporalDatasetPredict
-from src.matrix_factorization.tuning import Result, SharedMemoryResult
-from src.matrix_factorization.tuning import search, search_parallelize
+home = os.path.expanduser("~")
+sys.path.append(sys.path[0]+'/../../../data_generators')
 
+import src.dgd_data_generator
+import src.mask
+
+from dgdpredict.model import DGDClassifier
+from dgdpredict.data import TemporalDatasetTrain, TemporalDatasetPredict, TemporalDatasetKFold
+from dgdpredict.model_selection import Result, SharedMemoryResult
+from dgdpredict.model_selection import search, search_parallelize
+from dgdpredict.utils.special_matrices import finite_difference_matrix
 
 def gridsearch_synthetic_data(
     N_FOLDS=None,
@@ -23,42 +27,32 @@ def gridsearch_synthetic_data(
     HIGH_L1=1e2,
     LOW_L3=1e3,
     HIGH_L3=1e4,
-    N_STEPS_BIAS=101,
     K_UPPER_RANK_EST=5, 
     THETA_EST=2.5,
     PARALLELIZE=False
 ):
     # Prepare synthetic data
-    M = src.simulation.simulate_float_from_named_basis(
+    M = src.dgd_data_generator.simulate_float_from_named_basis(
         'simple_peaks',
-        N=35000,
+        N=38000,
         T=321,
         K=5,
         random_state=42
     )
 
-    parameters_simulate_integer = {
-        'output_domain': np.arange(1, 5),
-        'kernel_parameter': THETA_EST,
-    }
-
-    p = np.array([0.05, 0.15, 0.40, 0.60, 0.20])
-
-    parameters_simulate_mask = {
-        'mask_screening_proba': p,
-        'memory_length': 10,
-        'mask_level': 0.6
-    }
-
-    D = src.simulation.simulate_integer_from_float(
+    D = src.dgd_data_generator.simulate_dgd(
         M,
-        integer_parameters=parameters_simulate_integer,
+        domain_z=np.arange(1,5),
+        theta=2.5,
         random_state=42
     )
 
-    mask = src.simulation.simulate_mask(
+    mask = src.mask.simulate_mask(
         D,
-        mask_parameters=parameters_simulate_mask,
+        screening_proba=np.array([0.05, 0.15, 0.40, 0.60, 0.20]),
+        memory_length=10,
+        level=0.6,
+        path_dropout=path_to_project_root+'/data/dropout/Pdropout.npy',
         random_state=42
     )
 
@@ -73,16 +67,17 @@ def gridsearch_synthetic_data(
         l1_vals = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
         l3_vals = np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)
 
-        return MatrixFactorization(
+        return DGDClassifier(
             lambda0=1.0,
             lambda1=l1_vals[idx // N_STEPS_L3],
             lambda2=0.25,
             lambda3=l3_vals[idx % N_STEPS_L3],
             K=5,
             domain_z=np.arange(1, 5),
-            total_iterations=2000,
-            tolerance=1e-4,
-            T=321
+            z_to_binary_mapping=lambda x: np.array(x) > 1,
+            T=321,
+            max_iter=2000,
+            tol=1e-4
         )
 
     # Create indices that select a particular model
@@ -93,7 +88,6 @@ def gridsearch_synthetic_data(
         results = SharedMemoryResult(
             N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
             N_FOLDS=N_FOLDS,
-            N_STEPS_BIAS=N_STEPS_BIAS,
             N_Z=4,
             compute_recMSE=True
         )
@@ -111,7 +105,6 @@ def gridsearch_synthetic_data(
         results = Result(
             N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
             N_FOLDS=N_FOLDS,
-            N_STEPS_BIAS=N_STEPS_BIAS,
             N_Z=4,
             compute_recMSE=True
         )
@@ -136,7 +129,6 @@ def gridsearch_jerome_data(
     HIGH_L1=1e2,
     LOW_L3=1e3,
     HIGH_L3=1e4,
-    N_STEPS_BIAS=101,
     K_UPPER_RANK_EST=5, 
     THETA_EST=2.5,
     PARALLELIZE=True
@@ -154,15 +146,16 @@ def gridsearch_jerome_data(
         l1_vals = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
         l3_vals = np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)
 
-        return MatrixFactorization(
+        return DGDClassifier(
             lambda0=1.0,
             lambda1=l1_vals[idx // N_STEPS_L3],
             lambda2=0.25,
             lambda3=l3_vals[idx % N_STEPS_L3],
             K=5,
             domain_z=np.arange(1, 5),
-            total_iterations=2000,
-            tolerance=1e-4,
+            z_to_binary_mapping=lambda x: np.array(x) > 1,
+            max_iter=2000,
+            tol=1e-4,
             T=321
         )
 
@@ -174,7 +167,6 @@ def gridsearch_jerome_data(
         results = SharedMemoryResult(
             N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
             N_FOLDS=N_FOLDS,
-            N_STEPS_BIAS=N_STEPS_BIAS,
             N_Z=4,
             compute_recMSE=True
         )
@@ -192,7 +184,6 @@ def gridsearch_jerome_data(
         results = Result(
             N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
             N_FOLDS=N_FOLDS,
-            N_STEPS_BIAS=N_STEPS_BIAS,
             N_Z=4,
             compute_recMSE=True
         )
@@ -220,10 +211,9 @@ if __name__=='__main__':
         HIGH_L1=float(sys.argv[5]),
         LOW_L3=float(sys.argv[6]),
         HIGH_L3=float(sys.argv[7]),
-        N_STEPS_BIAS=int(sys.argv[8]),
-        K_UPPER_RANK_EST=int(sys.argv[9]),
-        THETA_EST=float(sys.argv[10]),
-        PARALLELIZE=eval(sys.argv[11])
+        K_UPPER_RANK_EST=int(sys.argv[8]),
+        THETA_EST=float(sys.argv[9]),
+        PARALLELIZE=eval(sys.argv[10])
     )
 
     print("Time spent: ", time.time() - t0)

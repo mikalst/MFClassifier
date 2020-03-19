@@ -10,11 +10,11 @@ from .data import TemporalDatasetPredict, TemporalDatasetKFold
 from .utils.special_matrices import finite_difference_matrix
 
 
-class TemporalMCClassifier(ClassifierMixin):
+class DGDClassifier(ClassifierMixin):
     """
     Temporal Matrix Completion (MC) Classifier.
 
-    TemporalMCClassifier fits a matrix decomposition model M = U V^T, 
+    DGDClassifier fits a matrix decomposition model M = U V^T, 
     as the hidden matrix from which X_train is assumed to be entrywise
     sampled through the discrete gaussian distribution. Targets are
     predicted by computing their similarity (likelihood) to fitted profiles
@@ -605,7 +605,7 @@ class TemporalMCClassifier(ClassifierMixin):
             return np.ones_like(proba_bin)*(proba_bin >= 1 - bias_bin)
 
 
-class TemporalMClassifierTesting(TemporalMCClassifier):
+class DGDClassifierTesting(DGDClassifier):
     """An extension of the MatrixFactorization class. Used for testing.
     """
 

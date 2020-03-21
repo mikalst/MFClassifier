@@ -37,7 +37,7 @@ class TemporalDatasetPredict(_TemporalDataset):
         elif self.prediction_rule == 'random':
             np.random.seed(random_state)
             time_of_prediction = np.array([np.argmin(np.abs(np.random.randint(
-                0, self.X.shape[1]) - np.argwhere(x != 0))) for x in self.X], dtype=np.int)
+                0, self.X.shape[1]) - np.arange(0, self.X.shape[1])*(x != 0))) for x in self.X], dtype=np.int)
 
         # Copy values to be predicted
         y_true = np.copy(self.X[range(self.X.shape[0]), time_of_prediction])

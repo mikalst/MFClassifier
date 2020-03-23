@@ -53,7 +53,7 @@ def gridsearch_synthetic_data(
         screening_proba=np.array([0.05, 0.15, 0.40, 0.60, 0.20]),
         memory_length=10,
         level=0.6,
-        path_dropout=path_to_project_root+'/data/dropout/Pdropout.npy',
+        #path_dropout=path_to_project_root+'/data/dropout/Pdropout.npy',
         random_state=42
     )
 

@@ -14,7 +14,7 @@ from dgdpredict.data import TemporalDatasetTrain, TemporalDatasetPredict, Tempor
 from dgdpredict.model import DGDClassifier
 
 home = os.path.expanduser("~")
-sys.path.append(sys.path[0]+'/../../../data_generators')
+sys.path.append(sys.path[0]+'/../../data_generators')
 
 import src.mask
 import src.dgd_data_generator

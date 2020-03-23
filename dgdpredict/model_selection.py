@@ -49,8 +49,8 @@ class Result(dict):
             )
 
             outfile.create_dataset(
-                "cms",
-                data=np.array(self["cms"]).reshape(
+                "confusion_matrix",
+                data=np.array(self["confusion_matrix"]).reshape(
                     shape+(self.attrs['N_Z'], self.attrs['N_Z'])
                 )
             )

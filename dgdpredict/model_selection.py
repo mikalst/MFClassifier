@@ -48,6 +48,19 @@ class Result(dict):
                 self.attrs['N_FOLDS']
             )
 
+            for key in ['lambda0', 'lambda1', 'lambda2', 'lambda3', 'K', 'theta']:
+                outfile.create_dataset(
+                    key,
+                    data=np.array(self[key]).reshape(shape)
+                )
+
+            outfile.create_dataset(
+                "lambda0",
+                data=np.array(self['lambda0']).reshape(
+                    shape
+                )
+            )
+
             outfile.create_dataset(
                 "confusion_matrix",
                 data=np.array(self["confusion_matrix"]).reshape(

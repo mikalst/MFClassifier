@@ -70,8 +70,8 @@ class Result(dict):
             )
 
             outfile.create_dataset(
-                "predSSE",
-                data=np.array(self["predSSE"]).reshape(shape)
+                "SSE",
+                data=np.array(self["SSE"]).reshape(shape)
             )
 
             if self.attrs['compute_recMSE']:

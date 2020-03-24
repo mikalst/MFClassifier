@@ -76,7 +76,7 @@ def gridsearch_synthetic_data(
             lambda3=l3_vals[idx % N_STEPS_L3],
             K=5,
             domain_z=np.arange(1, 5),
-            z_to_binary_mapping=lambda x: np.array(x) > 2,
+            z_to_binary_mapping=lambda x: np.array(x) > 1,
             T=321,
             max_iter=2000,
             tol=1e-4

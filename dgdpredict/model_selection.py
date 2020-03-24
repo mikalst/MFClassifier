@@ -76,6 +76,13 @@ class Result(dict):
             )
 
             outfile.create_dataset(
+                "accuracy_bin_with_bias",
+                data=np.array(self["accuracy_bin_with_bias"]).reshape(
+                    shape+(self.attrs['N_STEPS_BIAS'], )
+                )
+            )
+
+            outfile.create_dataset(
                 "SSE",
                 data=np.array(self["SSE"]).reshape(shape)
             )

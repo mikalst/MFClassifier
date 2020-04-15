@@ -78,8 +78,12 @@ class TemporalDatasetKFold(_TemporalDataset):
 
         self.__pred_obj = TemporalDatasetPredict(
             data=data, ground_truth=ground_truth, prediction_rule=self.prediction_rule, prediction_window=self.prediction_window, random_state=random_state)
-        self.__train_obj = TemporalDatasetTrain(
-            data=data[self.__pred_obj.valid_rows], ground_truth=ground_truth[self.__pred_obj.valid_rows])
+        if ground_truth is None:
+            self.__train_obj = TemporalDatasetTrain(
+                data=data[self.__pred_obj.valid_rows])
+        else:
+            self.__train_obj = TemporalDatasetTrain(
+                data=data[self.__pred_obj.valid_rows], ground_truth=ground_truth[self.__pred_obj.valid_rows])
 
         kf = sklearn.model_selection.KFold(n_splits, shuffle=False)
         self.__idc_per_fold = [

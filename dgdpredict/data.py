@@ -37,7 +37,7 @@ class TemporalDatasetPredict(_TemporalDataset):
         elif self.prediction_rule == 'random':
             np.random.seed(random_state)
             time_of_prediction = np.array([np.argmin(np.abs(np.random.randint(
-                0, self.X.shape[1]) - np.argwhere(x != 0))) for x in self.X], dtype=np.int)
+                0, self.X.shape[1]) - np.arange(0, self.X.shape[1])*(x != 0))) for x in self.X], dtype=np.int)
 
         # Copy values to be predicted
         y_true = np.copy(self.X[range(self.X.shape[0]), time_of_prediction])
@@ -72,18 +72,18 @@ class TemporalDatasetPredict(_TemporalDataset):
 
 class TemporalDatasetKFold(_TemporalDataset):
     def __init__(self, data, ground_truth=None, prediction_rule='last_observed', prediction_window=4, n_splits=5, random_state=42):
-
-        if not(ground_truth is None):
-            self.ground_truth = ground_truth
-
         self.prediction_rule = prediction_rule
         self.prediction_window = prediction_window
         self.n_splits = n_splits
 
         self.__pred_obj = TemporalDatasetPredict(
-            data=data, prediction_rule=self.prediction_rule, prediction_window=self.prediction_window, random_state=random_state)
-        self.__train_obj = TemporalDatasetTrain(
-            data=data[self.__pred_obj.valid_rows])
+            data=data, ground_truth=ground_truth, prediction_rule=self.prediction_rule, prediction_window=self.prediction_window, random_state=random_state)
+        if ground_truth is None:
+            self.__train_obj = TemporalDatasetTrain(
+                data=data[self.__pred_obj.valid_rows])
+        else:
+            self.__train_obj = TemporalDatasetTrain(
+                data=data[self.__pred_obj.valid_rows], ground_truth=ground_truth[self.__pred_obj.valid_rows])
 
         kf = sklearn.model_selection.KFold(n_splits, shuffle=False)
         self.__idc_per_fold = [
@@ -113,13 +113,13 @@ class TemporalDatasetKFold(_TemporalDataset):
     def ground_truth_train(self):
         if (self.ground_truth is None):
             return None
-        return self.ground_truth[self.__idc_train]
+        return self.__train_obj.ground_truth[self.__idc_train]
 
     @property
     def ground_truth_pred(self):
         if (self.ground_truth is None):
             return None
-        return self.ground_truth[self.__idc_pred]
+        return self.__pred_obj.ground_truth[self.__idc_pred]
 
     @property
     def i_fold(self):

@@ -53,7 +53,7 @@ def gridsearch_synthetic_data(
         screening_proba=np.array([0.05, 0.15, 0.40, 0.60, 0.20]),
         memory_length=10,
         level=0.6,
-        #path_dropout=path_to_project_root+'/data/dropout/Pdropout.npy',
+        path_dropout=path_to_project_root+'/data/dropout/Pdropout.npy',
         random_state=42
     )
 
@@ -133,7 +133,7 @@ def gridsearch_jerome_data(
     HIGH_L3=1e4,
     K_UPPER_RANK_EST=5,
     THETA_EST=2.5,
-    PARALLELIZE=True
+    PARALLELIZE=False
 ):
 
     # Prepare Jerome data
@@ -200,6 +200,101 @@ def gridsearch_jerome_data(
 
     results.save(
         path=path_to_project_root+'results/experiments_jerome_data/',
+        identifier=r"run{:d}.hdf5".format(int(time.time())),
+    )
+
+
+def gridsearch_hmm_data(
+    N_FOLDS=None,
+    N_STEPS_L1=25,
+    N_STEPS_L3=25,
+    LOW_L1=1,
+    HIGH_L1=1e2,
+    LOW_L3=1e3,
+    HIGH_L3=1e4,
+    K_UPPER_RANK_EST=5,
+    THETA_EST=2.5,
+    PARALLELIZE=False
+):
+    N=10000
+
+    # Prepare HMM data
+    D_hmm = np.empty((N, 321))
+    for i in range(N):
+        D_hmm[i] = src.hmm_data_generator.hmm_generator.simulate_profile(321, 16, 96)
+
+
+    mask = src.mask.simulate_mask(
+        D_hmm,
+        screening_proba=np.array([0.05, 0.15, 0.40, 0.60, 0.20]),
+        memory_length=10,
+        level=0.6,
+        path_dropout=path_to_project_root+'/data/dropout/Pdropout.npy',
+        random_state=42
+    )
+
+    X_hmm = D_hmm*mask
+
+    # Create data object
+    data_obj = TemporalDatasetKFold(
+        X_hmm, prediction_rule='last_observed', n_splits=N_FOLDS)
+
+    # Prepare a model generator that yields a model for every index
+    def model_generator(idx):
+
+        l1_vals = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
+        l3_vals = np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)
+
+        return DGDClassifier(
+            lambda0=1.0,
+            lambda1=l1_vals[idx // N_STEPS_L3],
+            lambda2=0.25,
+            lambda3=l3_vals[idx % N_STEPS_L3],
+            K=5,
+            domain_z=np.arange(1, 5),
+            z_to_binary_mapping=lambda x: np.array(x) > 2,
+            T=321,
+            max_iter=2000,
+            tol=1e-4
+        )
+
+    # Create indices that select a particular model
+    idc_parameter_select = np.arange(0, N_STEPS_L1*N_STEPS_L3)
+
+    if PARALLELIZE:
+        # Allocated empty results object
+        results = SharedMemoryResult(
+            N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
+            N_FOLDS=N_FOLDS,
+            N_Z=4,
+            compute_recMSE=True
+        )
+
+        # Search in parallel over all possible models
+        search_parallelize(
+            data_obj,
+            model_generator,
+            idc_parameter_select,
+            results,
+            N_CPU=4
+        )
+    else:
+        # Allocated empty results object
+        results = Result(
+            N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
+            N_FOLDS=N_FOLDS,
+            N_Z=4,
+            compute_recMSE=True
+        )
+        search(
+            data_obj,
+            model_generator,
+            idc_parameter_select,
+            results
+        )
+
+    results.save(
+        path=path_to_project_root+'results/experiments_hmm_data/',
         identifier=r"run{:d}.hdf5".format(int(time.time())),
     )
 

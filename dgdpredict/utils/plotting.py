@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gs
 import numpy as np
 import scipy.sparse
 import sklearn.decomposition
@@ -21,9 +22,9 @@ def plot_distribution_per_woman(matrix1, matrix2, sparse=False, title_postfix=""
         data3 = np.sum(matrix1 == 4, axis=1)
         data5 = np.sum(matrix1 != 0, axis=1)
 
-    data2 = np.sum(matrix2 == 3, axis=1).A1
-    data4 = np.sum(matrix2 == 4, axis=1).A1
-    data6 = np.sum(matrix2 != 0, axis=1).A1
+    data2 = np.sum(matrix2 == 3, axis=1)
+    data4 = np.sum(matrix2 == 4, axis=1)
+    data6 = np.sum(matrix2 != 0, axis=1)
 
     plt.subplot(3, 2, 1)
     plt.title("Synthetic" + title_postfix)
@@ -101,7 +102,7 @@ def plot_sparsity(matrix1, matrix2):
 def plot_single(
     matrix,
     vrange=(1, 4),
-    plot_dims=(14, 6),
+    figsize=(4.74, 4.74),
     title=None,
     output_file=None,
     show_missing=None,
@@ -118,29 +119,32 @@ def plot_single(
     if title is None:
         title = 'matrix'
 
-    fig, ax = plt.subplots(
-            figsize=(plot_dims[0], plot_dims[1])
-    )
+    NROWS = 300
+    NCOLS = 321
+
+    fig = plt.figure(constrained_layout=True)
+    fig.set_size_inches(figsize[0], figsize[1])
+    spec = gs.GridSpec(ncols=4, nrows=1, figure=fig)
+    ax = fig.add_subplot(spec[0, 1:3])
+
+    idc_rows = np.linspace(0, matrix.shape[0]-1, NROWS, dtype=np.int)
+    idc_cols = np.linspace(0, matrix.shape[1]-1, NCOLS, dtype=np.int)
     
     if scipy.sparse.issparse(matrix):
-        matrix_show = matrix[np.linspace(0, matrix.shape[0]-1, 400, dtype=np.int)].todense()
+        matrix_show = matrix[:, idc_cols][idc_rows].todense()
     else:
-        matrix_show = matrix[np.linspace(0, matrix.shape[0]-1, 400, dtype=np.int)]
+        matrix_show = matrix[:, idc_cols][idc_rows]
 
     out = ax.imshow(matrix_show, aspect="auto", 
-                        vmin=vrange[0], vmax=vrange[1], cmap=cmap_copy)
+                    vmin=vrange[0]-0.5, vmax=vrange[1]+0.5, cmap=cmap_copy)
 
-    ax.set_ylabel("N")
     ax.set_xlabel("T ({})".format(matrix.shape[1]))
-    ax.tick_params(axis='both', labelbottom=False, labelleft=False)
     ax.set_ylabel("N ({})".format(matrix.shape[0]))
-    ax.title.set_text(title)
+    ax.tick_params(axis='both', labelbottom=False, labelleft=False)
+    ax.set_title(title)
 
-    fig.subplots_adjust(right=0.88)
-    cbar_ax = fig.add_axes([0.9, 0.13, 0.015, 0.74])
-    fig.colorbar(out, cax=cbar_ax, orientation='vertical')
-
-    plt.subplots_adjust(wspace=0.12, hspace=0.10)
+    cbar_ax = fig.add_axes([0.76, 0.07, 0.015, 0.86])
+    fig.colorbar(out, cax=cbar_ax, ticks=np.arange(vrange[0], vrange[1]+1), orientation='vertical')
 
     # Save output
     if output_file is None:
@@ -153,18 +157,21 @@ def plot_single(
 def plot_visual(
         matrices, 
         vrange=(1, 4),
-        plot_dims=(12, 7),
+        figsize=(4.74, 4.74),
         titles=None,
         output_file=None,
         show_missing=None,
         cmap=plt.get_cmap('viridis')
 ):
 
-    if len(matrices) == 1:
+    NROWS = 200
+    NCOLS = 200
+
+    if type(matrices) not in (tuple, list):
         plot_single(
-            matrices[0],
+            matrices,
             vrange,
-            plot_dims,
+            figsize,
             titles,
             output_file,
             show_missing,
@@ -185,35 +192,25 @@ def plot_visual(
     if titles is None:
         titles = ['matrix' + str(i) for i in range(len(matrices))]
 
-    if len(matrices) % 2 == 0:
-        fig, axes = plt.subplots(
-            figsize=(plot_dims[0], plot_dims[1]*(len(matrices)//2)),
-            nrows=len(matrices)//2,
-            ncols=2
-        )
+    fig, axes = plt.subplots(
+        nrows=len(matrices)//2 + len(matrices)%2,
+        ncols=2
+    )
 
-    elif len(matrices) % 3 == 0:
-        fig, axes = plt.subplots(
-            figsize=(plot_dims[0], plot_dims[1]*(len(matrices)//3)),
-            nrows=len(matrices)//3,
-            ncols=3
-        )
-
-    else:
-        fig, axes = plt.subplots(
-            figsize=(plot_dims[0], plot_dims[1]*(len(matrices)//3 + 1)),
-            nrows=len(matrices)//3 + 1,
-            ncols=3
-        )
+    fig.set_size_inches(figsize[0], figsize[1])
 
     for i, ax in enumerate(axes.flat):
+
+        idc_rows = np.linspace(0, matrices[i].shape[0]-1, NROWS, dtype=np.int)
+        idc_cols = np.linspace(0, matrices[i].shape[1]-1, NCOLS, dtype=np.int)
+
         if scipy.sparse.issparse(matrices[i]):
-            matrix = matrices[i][np.linspace(0, matrices[i].shape[0]-1, 200, dtype=np.int)].todense()
+            matrix = matrices[i][:, idc_cols][idc_rows].todense()
         else:
-            matrix = matrices[i][np.linspace(0, matrices[i].shape[0]-1, 200, dtype=np.int)]
+            matrix = matrices[i][:, idc_cols][idc_rows]
 
         out = ax.imshow(matrix, aspect="auto", 
-                        vmin=vrange[0], vmax=vrange[1], cmap=get_cmap(i))
+                        vmin=vrange[0]-0.5, vmax=vrange[1]+0.5, cmap=get_cmap(i))
 
         ax.set_ylabel("N")
         ax.set_xlabel("T ({})".format(matrices[i].shape[1]))
@@ -223,16 +220,19 @@ def plot_visual(
 
     fig.subplots_adjust(right=0.88)
     cbar_ax = fig.add_axes([0.9, 0.13, 0.015, 0.74])
-    fig.colorbar(out, cax=cbar_ax, orientation='vertical')
-
-    plt.subplots_adjust(wspace=0.12, hspace=0.10)
+    fig.colorbar(out, cax=cbar_ax, ticks=np.arange(vrange[0], vrange[1]+1), orientation='vertical')
+    plt.subplots_adjust(wspace=0.12, hspace=0.12)
 
     # Save output
     if output_file is None:
         plt.show()
     else:
-        plt.savefig(output_file)
-        plt.show()
+        plt.savefig(
+            output_file,
+            dpi=1000, 
+            # Plot will be occupy a maximum of available space
+            bbox_inches='tight'
+        )
 
 
 def plot_compare_svd_with_basis(S, path_to_basis):

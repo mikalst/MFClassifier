@@ -24,6 +24,7 @@ class Result(dict):
         self['accuracy_bin_with_bias'] = np.empty(shape=(N_SEARCH_POINTS*N_FOLDS*N_STEPS_BIAS))
         self['sensitivity_with_bias'] = np.empty(shape=(N_SEARCH_POINTS*N_FOLDS*N_STEPS_BIAS))
         self['specificity_with_bias'] = np.empty(shape=(N_SEARCH_POINTS*N_FOLDS*N_STEPS_BIAS))
+        self['sklearn_auc'] = np.empty(shape=(N_SEARCH_POINTS*N_FOLDS))
         self['SSE'] = np.empty(shape=(N_SEARCH_POINTS*N_FOLDS))
 
         # Optional scoring measure
@@ -83,6 +84,11 @@ class Result(dict):
             )
 
             outfile.create_dataset(
+                "sklearn_auc",
+                data=np.array(self["sklearn_auc"]).reshape(shape)
+            )
+
+            outfile.create_dataset(
                 "SSE",
                 data=np.array(self["SSE"]).reshape(shape)
             )
@@ -133,6 +139,7 @@ def _score(model, data_obj, result_obj, idx):
         result_obj['specificity_with_bias'][N_STEPS_BIAS*idx + i_bias] = np.mean(predict_bin[y_true_bin == 0] == y_true_bin[y_true_bin == 0])
         result_obj['accuracy_bin_with_bias'][N_STEPS_BIAS*idx + i_bias] = np.mean(predict_bin == y_true_bin)
 
+    result_obj['sklearn_auc'][idx] = sklearn.metrics.roc_auc_score(y_true_bin, predicted_proba_binary)
     result_obj['SSE'][idx] = np.mean(((model.U@model.V.T - model.X_train)[model.nonzero_rows, model.nonzero_cols])**2)
     
     # Optional scoring measure
@@ -154,7 +161,6 @@ def search(
         model = model_generator(idx)
 
         for i_fold in range(N_FOLDS):
-    
             data_obj.i_fold = i_fold
             model.fit(data_obj.X_train)
             _score(model, data_obj, result_obj, N_FOLDS*idx + i_fold)

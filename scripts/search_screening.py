@@ -1,4 +1,3 @@
-import os
 import sys
 import time
 import multiprocessing
@@ -12,12 +11,6 @@ from dgdpredict.model_selection import search, search_parallelize
 from dgdpredict.model_selection import Result, SharedMemoryResult
 from dgdpredict.data import TemporalDatasetTrain, TemporalDatasetPredict, TemporalDatasetKFold
 from dgdpredict.model import DGDClassifier
-
-home = os.path.expanduser("~")
-sys.path.append(sys.path[0]+'/../../data_generators')
-
-import src.mask
-import src.dgd_data_generator
 
 
 def gridsearch_jerome_data(

@@ -6,7 +6,7 @@ import h5py
 import sklearn.metrics
 
 
-N_STEPS_BIAS = 100
+N_STEPS_BIAS = 10000
 
 
 class Result(dict):
@@ -25,6 +25,7 @@ class Result(dict):
         self['sensitivity_with_bias'] = np.empty(shape=(N_SEARCH_POINTS*N_FOLDS*N_STEPS_BIAS))
         self['specificity_with_bias'] = np.empty(shape=(N_SEARCH_POINTS*N_FOLDS*N_STEPS_BIAS))
         self['sklearn_auc'] = np.empty(shape=(N_SEARCH_POINTS*N_FOLDS))
+        self['sklearn_mcc'] = np.empty(shape=(N_SEARCH_POINTS*N_FOLDS))
         self['SSE'] = np.empty(shape=(N_SEARCH_POINTS*N_FOLDS))
 
         # Optional scoring measure
@@ -89,6 +90,11 @@ class Result(dict):
             )
 
             outfile.create_dataset(
+                "sklearn_mcc",
+                data=np.array(self["sklearn_mcc"]).reshape(shape)
+            )
+
+            outfile.create_dataset(
                 "SSE",
                 data=np.array(self["SSE"]).reshape(shape)
             )
@@ -121,6 +127,7 @@ def _score(model, data_obj, result_obj, idx):
     result_obj['K'][idx] = model.K
     result_obj['theta'][idx] = model.theta
 
+    # Multiclass metrics
     N_Z = result_obj.attrs['N_Z']
     predicted_z = model.predict(data_obj.X_pred_regressor, data_obj.time_of_prediction)
     result_obj['confusion_matrix'][idx*N_Z**2: (idx+1)*N_Z**2] = (
@@ -130,7 +137,9 @@ def _score(model, data_obj, result_obj, idx):
             labels=model.domain_z
         )
     ).flatten()
+    result_obj['sklearn_mcc'][idx] = sklearn.metrics.matthews_corrcoef(predicted_z, data_obj.y_true)
 
+    # Binary metrics
     predicted_proba_binary = model.predict_proba_binary(data_obj.X_pred_regressor, data_obj.time_of_prediction)
     y_true_bin = model.z_to_binary_mapping(data_obj.y_true)
     for i_bias, bias in enumerate(np.linspace(0, 1, N_STEPS_BIAS)):
@@ -142,7 +151,7 @@ def _score(model, data_obj, result_obj, idx):
     result_obj['sklearn_auc'][idx] = sklearn.metrics.roc_auc_score(y_true_bin, predicted_proba_binary)
     result_obj['SSE'][idx] = np.mean(((model.U@model.V.T - model.X_train)[model.nonzero_rows, model.nonzero_cols])**2)
     
-    # Optional scoring measure
+    # Optional scoring metrics
     if result_obj.attrs['compute_recMSE']:
         result_obj['recMSE'][idx] = np.mean(((model.U@model.V.T - data_obj.ground_truth_train)[~model.nonzero_rows, ~model.nonzero_cols])**2)
 

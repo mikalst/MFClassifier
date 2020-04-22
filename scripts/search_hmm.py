@@ -83,7 +83,7 @@ def gridsearch_hmm_data(
             N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
             N_FOLDS=N_FOLDS,
             N_Z=4,
-            compute_recMSE=True
+            compute_recMSE=False
         )
 
         # Search in parallel over all possible models
@@ -100,7 +100,7 @@ def gridsearch_hmm_data(
             N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
             N_FOLDS=N_FOLDS,
             N_Z=4,
-            compute_recMSE=True
+            compute_recMSE=False
         )
         search(
             data_obj,

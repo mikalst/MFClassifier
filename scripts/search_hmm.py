@@ -16,8 +16,8 @@ from dgdpredict.model import DGDClassifier
 home = os.path.expanduser("~")
 sys.path.append(sys.path[0]+'/../../data_generators')
 
+import src.hmm_data_generator.hmm_generator
 import src.mask
-import src.hmm_data_generator
 
 
 def gridsearch_hmm_data(

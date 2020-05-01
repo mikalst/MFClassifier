@@ -72,7 +72,7 @@ def gridsearch_synthetic_data(
         return DGDClassifier(
             lambda0=1.0,
             lambda1=l1_vals[idx // N_STEPS_L3],
-            lambda2=0.25,
+            lambda2=0.00,
             lambda3=l3_vals[idx % N_STEPS_L3],
             K=5,
             domain_z=np.arange(1, 5),

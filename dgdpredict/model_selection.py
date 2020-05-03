@@ -10,7 +10,7 @@ N_STEPS_BIAS = 10000
 
 
 class Result(dict):
-    def __init__(self, N_SEARCH_POINTS, N_FOLDS, N_Z, compute_recMSE=False):
+    def __init__(self, N_SEARCH_POINTS, N_FOLDS, N_Z, compute_recMSE=False, usingTemporalConvolution=False):
         # Input parameters
         self['lambda0'] = np.empty(shape=(N_SEARCH_POINTS*N_FOLDS))
         self['lambda1'] = np.empty(shape=(N_SEARCH_POINTS*N_FOLDS))
@@ -37,7 +37,8 @@ class Result(dict):
             'N_FOLDS': N_FOLDS,
             'N_Z': N_Z,
             'N_STEPS_BIAS': N_STEPS_BIAS,
-            'compute_recMSE': compute_recMSE
+            'compute_recMSE': compute_recMSE,
+            'temporalConvolution': usingTemporalConvolution
         }
 
     def save(self, path, identifier):

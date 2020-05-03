@@ -14,16 +14,17 @@ from dgdpredict.model import DGDClassifier
 
 
 def gridsearch_jerome_data(
-    N_FOLDS=None,
-    N_STEPS_L1=25,
-    N_STEPS_L3=25,
-    LOW_L1=1,
-    HIGH_L1=1e2,
-    LOW_L3=1e3,
-    HIGH_L3=1e4,
-    K_UPPER_RANK_EST=5,
-    THETA_EST=2.5,
-    PARALLELIZE=False
+    N_FOLDS,
+    N_STEPS_L1,
+    N_STEPS_L3,
+    LOW_L1,
+    HIGH_L1,
+    LOW_L3,
+    HIGH_L3,
+    K_UPPER_RANK_EST,
+    THETA_EST,
+    CONVOLUTION=False,
+    PARALLELIZE=True
 ):
 
     # Prepare Jerome data
@@ -35,23 +36,44 @@ def gridsearch_jerome_data(
         X_jerome, prediction_rule='last_observed', n_splits=N_FOLDS)
 
     # Prepare a model generator that yields a model for every index
-    def model_generator(idx):
 
-        l1_vals = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
-        l3_vals = np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)
+    if CONVOLUTION:
+        def model_generator(idx):
+            f = lambda x: np.exp(-1*np.abs(x))
+            l1_vals = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
+            l3_vals = np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)
 
-        return DGDClassifier(
-            lambda0=1.0,
-            lambda1=l1_vals[idx // N_STEPS_L3],
-            lambda2=0.25,
-            lambda3=l3_vals[idx % N_STEPS_L3],
-            K=5,
-            domain_z=np.arange(1, 5),
-            z_to_binary_mapping=lambda x: np.array(x) > 2,
-            T=321,
-            max_iter=2000,
-            tol=1e-4
-        )
+            return DGDClassifier(
+                lambda0=1.0,
+                lambda1=l1_vals[idx // N_STEPS_L3],
+                lambda2=0.0,
+                lambda3=l3_vals[idx % N_STEPS_L3],
+                K=5,
+                C=[f(np.arange(data_obj.X_train.shape[1]) - i) for i in np.arange(data_obj.X_train.shape[1])],
+                domain_z=np.arange(1, 5),
+                z_to_binary_mapping=lambda x: np.array(x) > 2,
+                T=321,
+                max_iter=2000,
+                tol=1e-4
+            )
+    else:
+        def model_generator(idx):
+
+            l1_vals = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
+            l3_vals = np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)
+
+            return DGDClassifier(
+                lambda0=1.0,
+                lambda1=l1_vals[idx // N_STEPS_L3],
+                lambda2=0.0,
+                lambda3=l3_vals[idx % N_STEPS_L3],
+                K=5,
+                domain_z=np.arange(1, 5),
+                z_to_binary_mapping=lambda x: np.array(x) > 2,
+                T=321,
+                max_iter=2000,
+                tol=1e-4
+            )
 
     # Create indices that select a particular model
     idc_parameter_select = np.arange(0, N_STEPS_L1*N_STEPS_L3)
@@ -62,7 +84,8 @@ def gridsearch_jerome_data(
             N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
             N_FOLDS=N_FOLDS,
             N_Z=4,
-            compute_recMSE=False
+            compute_recMSE=False,
+            usingTemporalConvolution=CONVOLUTION
         )
 
         # Search in parallel over all possible models
@@ -79,7 +102,8 @@ def gridsearch_jerome_data(
             N_SEARCH_POINTS=N_STEPS_L1*N_STEPS_L3,
             N_FOLDS=N_FOLDS,
             N_Z=4,
-            compute_recMSE=False
+            compute_recMSE=False,
+            usingTemporalConvolution=CONVOLUTION
         )
         search(
             data_obj,

@@ -132,7 +132,8 @@ if __name__ == '__main__':
         HIGH_L3=float(sys.argv[7]),
         K_UPPER_RANK_EST=int(sys.argv[8]),
         THETA_EST=float(sys.argv[9]),
-        PARALLELIZE=eval(sys.argv[10])
+        CONVOLUTION=eval(sys.argv[10]),
+        PARALLELIZE=eval(sys.argv[11])
     )
 
     print("Time spent: ", time.time() - t0)

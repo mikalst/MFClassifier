@@ -111,8 +111,8 @@ class Result(dict):
 
 
 class SharedMemoryResult(Result):
-    def __init__(self, N_SEARCH_POINTS, N_FOLDS, N_Z, compute_recMSE=False):
-        super(SharedMemoryResult, self).__init__(N_SEARCH_POINTS, N_FOLDS, N_Z, compute_recMSE)
+    def __init__(self, N_SEARCH_POINTS, N_FOLDS, N_Z, compute_recMSE=False, usingTemporalConvolution=False):
+        super(SharedMemoryResult, self).__init__(N_SEARCH_POINTS, N_FOLDS, N_Z, compute_recMSE, usingTemporalConvolution)
 
         for key in self.keys():
             self[key] = Array('d', (self[key]))

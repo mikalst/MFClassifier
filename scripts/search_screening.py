@@ -46,7 +46,7 @@ def gridsearch_jerome_data(
             return DGDClassifier(
                 lambda0=1.0,
                 lambda1=l1_vals[idx // N_STEPS_L3],
-                lambda2=0.0,
+                lambda2=l1_vals[idx // N_STEPS_L3],
                 lambda3=l3_vals[idx % N_STEPS_L3],
                 K=5,
                 C=[f(np.arange(data_obj.X_train.shape[1]) - i) for i in np.arange(data_obj.X_train.shape[1])],
@@ -65,7 +65,7 @@ def gridsearch_jerome_data(
             return DGDClassifier(
                 lambda0=1.0,
                 lambda1=l1_vals[idx // N_STEPS_L3],
-                lambda2=0.0,
+                lambda2=l1_vals[idx // N_STEPS_L3],
                 lambda3=l3_vals[idx % N_STEPS_L3],
                 K=5,
                 domain_z=np.arange(1, 5),

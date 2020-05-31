@@ -143,7 +143,7 @@ def plot_single(
     ax.tick_params(axis='both', labelbottom=False, labelleft=False)
     ax.set_title(title)
 
-    cbar_ax = fig.add_axes([0.76, 0.07, 0.015, 0.86])
+    cbar_ax = fig.add_axes([0.76, 0.10, 0.015, 0.80])
     fig.colorbar(out, cax=cbar_ax, ticks=np.arange(vrange[0], vrange[1]+1), orientation='vertical')
 
     # Save output
@@ -152,6 +152,87 @@ def plot_single(
     else:
         plt.savefig(output_file)
         plt.show()
+
+
+def plot_visual_continuous(
+        matrices, 
+        vrange=(1, 4),
+        figsize=(4.74, 3.00),
+        titles=None,
+        output_file=None,
+        show_missing=None,
+        cmap=plt.get_cmap('viridis')
+):
+
+    NROWS = 200
+    NCOLS = 200
+
+    if type(matrices) not in (tuple, list):
+        plot_single(
+            matrices,
+            vrange,
+            figsize,
+            titles,
+            output_file,
+            show_missing,
+            cmap
+        )
+        return
+
+    nonmasked_cmap = copy.copy(cmap)
+    masked_cmap = copy.copy(cmap)
+    # make locations under vmin translucent black
+    masked_cmap.set_under('white', alpha=0.8)
+
+    if show_missing is None:
+        show_missing = [False]*len(matrices)
+
+    get_cmap = lambda i: masked_cmap if show_missing[i] else nonmasked_cmap
+
+    if titles is None:
+        titles = ['matrix' + str(i) for i in range(len(matrices))]
+
+    fig, axes = plt.subplots(
+        nrows=len(matrices)//2 + len(matrices)%2,
+        ncols=2
+    )
+
+    fig.set_size_inches(figsize[0], figsize[1])
+
+    for i, ax in enumerate(axes.flat):
+
+        idc_rows = np.linspace(0, matrices[i].shape[0]-1, NROWS, dtype=np.int)
+        idc_cols = np.linspace(0, matrices[i].shape[1]-1, NCOLS, dtype=np.int)
+
+        if scipy.sparse.issparse(matrices[i]):
+            matrix = matrices[i][:, idc_cols][idc_rows].todense()
+        else:
+            matrix = matrices[i][:, idc_cols][idc_rows]
+
+        out = ax.imshow(matrix, aspect="auto", 
+                        vmin=vrange[0], vmax=vrange[1], cmap=get_cmap(i))
+
+        ax.set_ylabel("N")
+        ax.set_xlabel("T ({})".format(matrices[i].shape[1]))
+        ax.tick_params(axis='both', labelbottom=False, direction='inout', color='k', labelleft=False)
+        ax.set_ylabel("N ({})".format(matrices[i].shape[0]))
+        ax.title.set_text(titles[i])
+
+    fig.subplots_adjust(right=0.88)
+    cbar_ax = fig.add_axes([0.9, 0.13, 0.015, 0.74])
+    fig.colorbar(out, cax=cbar_ax, orientation='vertical')
+    plt.subplots_adjust(wspace=0.12, hspace=0.12)
+
+    # Save output
+    if output_file is None:
+        plt.show()
+    else:
+        plt.savefig(
+            output_file,
+            dpi=1000, 
+            # Plot will be occupy a maximum of available space
+            bbox_inches='tight'
+        )
 
 
 def plot_visual(

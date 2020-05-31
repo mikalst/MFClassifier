@@ -158,6 +158,7 @@ def plot_visual_continuous(
         matrices, 
         vrange=(1, 4),
         figsize=(4.74, 3.00),
+        fig_arrangement=(1,2),
         titles=None,
         output_file=None,
         show_missing=None,
@@ -239,13 +240,14 @@ def plot_visual(
         matrices, 
         vrange=(1, 4),
         figsize=(4.74, 4.74),
+        fig_arrangement=(1,2),
         titles=None,
         output_file=None,
         show_missing=None,
         cmap=plt.get_cmap('viridis')
 ):
 
-    NROWS = 200
+    NROWS = 100
     NCOLS = 200
 
     if type(matrices) not in (tuple, list):
@@ -274,8 +276,8 @@ def plot_visual(
         titles = ['matrix' + str(i) for i in range(len(matrices))]
 
     fig, axes = plt.subplots(
-        nrows=len(matrices)//2 + len(matrices)%2,
-        ncols=2
+        nrows=fig_arrangement[0],
+        ncols=fig_arrangement[1]
     )
 
     fig.set_size_inches(figsize[0], figsize[1])
@@ -296,13 +298,21 @@ def plot_visual(
         ax.set_ylabel("N")
         ax.set_xlabel("T ({})".format(matrices[i].shape[1]))
         ax.tick_params(axis='both', labelbottom=False, labelleft=False)
+        ax.tick_params(axis='both', length=0)
         ax.set_ylabel("N ({})".format(matrices[i].shape[0]))
         ax.title.set_text(titles[i])
 
-    fig.subplots_adjust(right=0.88)
-    cbar_ax = fig.add_axes([0.9, 0.13, 0.015, 0.74])
-    fig.colorbar(out, cax=cbar_ax, ticks=np.arange(vrange[0], vrange[1]+1), orientation='vertical')
-    plt.subplots_adjust(wspace=0.12, hspace=0.12)
+    if fig_arrangement[1] == 2:
+        fig.subplots_adjust(right=0.88)
+        cbar_ax = fig.add_axes([0.9, 0.13, 0.015, 0.74])
+        fig.colorbar(out, cax=cbar_ax, ticks=np.arange(vrange[0], vrange[1]+1), orientation='vertical')
+        plt.subplots_adjust(wspace=0.12, hspace=0.12)
+    elif fig_arrangement[1] == 3:
+        fig.subplots_adjust(right=0.95)
+        cbar_ax = fig.add_axes([0.96, 0.125, 0.015, 0.755])
+        fig.colorbar(out,cbar_ax, ticks=np.arange(vrange[0], vrange[1]+1), orientation='vertical')
+        #plt.subplots_adjust(wspace=0.12, hspace=0.12)
+        #plt.tight_layout()
 
     # Save output
     if output_file is None:
@@ -310,7 +320,6 @@ def plot_visual(
     else:
         plt.savefig(
             output_file,
-            dpi=1000, 
             # Plot will be occupy a maximum of available space
             bbox_inches='tight'
         )

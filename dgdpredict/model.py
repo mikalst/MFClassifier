@@ -101,7 +101,8 @@ class DGDClassifier(ClassifierMixin):
         J=None,
         C=None,
         max_iter=1000,
-        tol=1e-4
+        tol=1e-4,
+        new_init_method=False
     ):
         # Regularization parameters
         self.lambda0 = lambda0
@@ -143,6 +144,8 @@ class DGDClassifier(ClassifierMixin):
         self.__proba_z_precomputed = None
         self.__ds_X_hash = None
         self.__ds_t_hash = None
+
+        self.new_init_method = new_init_method
 
     def resetV(self):
         self.V = np.ones((self.T, self.K)) * \
@@ -312,8 +315,7 @@ class DGDClassifier(ClassifierMixin):
         self.U = np.ones((self.N, self.K))
         self.U_old = np.zeros((self.N, self.K))
         # Initialize V
-        self.V = np.ones((self.T, self.K)) * \
-            np.mean(self.X_train[self.nonzero_rows, self.nonzero_cols])
+        self.V = np.ones((self.T, self.K)) * np.linspace(self.domain_z[0], self.domain_z[-1], self.K)
         self.V_old = np.zeros((self.T, self.K))
         # Initialize S
         self.S = self.X_train.copy()
@@ -601,4 +603,4 @@ class DGDClassifier(ClassifierMixin):
         if bias_bin is None:
             return np.ones_like(proba_bin)*(proba_bin >= 0.5)
         else:
-            return np.ones_like(proba_bin)*(proba_bin >= 1 - bias_bin)
+            return np.ones_like(proba_bin)*(proba_bin >= bias_bin)

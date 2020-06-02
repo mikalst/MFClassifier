@@ -162,10 +162,11 @@ def plot_visual_continuous(
         titles=None,
         output_file=None,
         show_missing=None,
-        cmap=plt.get_cmap('viridis')
+        cmap=plt.get_cmap('viridis'),
+        suptitle=None
 ):
 
-    NROWS = 200
+    NROWS = 100
     NCOLS = 200
 
     if type(matrices) not in (tuple, list):
@@ -194,8 +195,8 @@ def plot_visual_continuous(
         titles = ['matrix' + str(i) for i in range(len(matrices))]
 
     fig, axes = plt.subplots(
-        nrows=len(matrices)//2 + len(matrices)%2,
-        ncols=2
+        nrows=fig_arrangement[0],
+        ncols=fig_arrangement[1]
     )
 
     fig.set_size_inches(figsize[0], figsize[1])
@@ -218,11 +219,19 @@ def plot_visual_continuous(
         ax.tick_params(axis='both', labelbottom=False, direction='inout', color='k', labelleft=False)
         ax.set_ylabel("N ({})".format(matrices[i].shape[0]))
         ax.title.set_text(titles[i])
-
-    fig.subplots_adjust(right=0.88)
-    cbar_ax = fig.add_axes([0.9, 0.13, 0.015, 0.74])
-    fig.colorbar(out, cax=cbar_ax, orientation='vertical')
-    plt.subplots_adjust(wspace=0.12, hspace=0.12)
+    
+    if fig_arrangement[1] == 2:
+        fig.subplots_adjust(right=0.95)
+        cbar_ax = fig.add_axes([0.96, 0.125, 0.015, 0.755])
+        fig.colorbar(out, cbar_ax, orientation='vertical')
+    elif fig_arrangement[1] == 3:
+        fig.subplots_adjust(right=0.95)
+        cbar_ax = fig.add_axes([0.96, 0.125, 0.015, 0.755])
+        fig.colorbar(out, cbar_ax, orientation='vertical')
+        #plt.subplots_adjust(wspace=0.12, hspace=0.12)
+        #plt.tight_layout()
+    if not(suptitle is None):
+        plt.suptitle(suptitle)
 
     # Save output
     if output_file is None:
@@ -303,14 +312,13 @@ def plot_visual(
         ax.title.set_text(titles[i])
 
     if fig_arrangement[1] == 2:
-        fig.subplots_adjust(right=0.88)
-        cbar_ax = fig.add_axes([0.9, 0.13, 0.015, 0.74])
-        fig.colorbar(out, cax=cbar_ax, ticks=np.arange(vrange[0], vrange[1]+1), orientation='vertical')
-        plt.subplots_adjust(wspace=0.12, hspace=0.12)
+        fig.subplots_adjust(right=0.95)
+        cbar_ax = fig.add_axes([0.96, 0.125, 0.015, 0.755])
+        fig.colorbar(out, cbar_ax, ticks=np.arange(vrange[0], vrange[1]+1), orientation='vertical')
     elif fig_arrangement[1] == 3:
         fig.subplots_adjust(right=0.95)
         cbar_ax = fig.add_axes([0.96, 0.125, 0.015, 0.755])
-        fig.colorbar(out,cbar_ax, ticks=np.arange(vrange[0], vrange[1]+1), orientation='vertical')
+        fig.colorbar(out, cbar_ax, ticks=np.arange(vrange[0], vrange[1]+1), orientation='vertical')
         #plt.subplots_adjust(wspace=0.12, hspace=0.12)
         #plt.tight_layout()
 

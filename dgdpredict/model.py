@@ -126,7 +126,7 @@ class DGDClassifier(ClassifierMixin):
             self.R = finite_difference_matrix(T)
         self.J = J
         if (self.J is None):
-            self.J = np.zeros((T, K))   
+            self.J = np.ones((T, K))   
         self.C = C
         if (self.C is None):
             self.C = np.identity(T)

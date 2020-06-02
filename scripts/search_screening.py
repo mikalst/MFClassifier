@@ -40,8 +40,8 @@ def gridsearch_jerome_data(
     if CONVOLUTION:
         def model_generator(idx):
             f = lambda x: np.exp(-1*np.abs(x))
-            l1_vals = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
-            l3_vals = np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)
+            l1_vals = np.logspace(LOW_L1, HIGH_L1, N_STEPS_L1)
+            l3_vals = np.logspace(LOW_L3, HIGH_L3, N_STEPS_L3)
 
             return DGDClassifier(
                 lambda0=1.0,
@@ -49,6 +49,7 @@ def gridsearch_jerome_data(
                 lambda2=l1_vals[idx // N_STEPS_L3],
                 lambda3=l3_vals[idx % N_STEPS_L3],
                 K=5,
+                theta=THETA_EST,
                 C=[f(np.arange(data_obj.X_train.shape[1]) - i) for i in np.arange(data_obj.X_train.shape[1])],
                 domain_z=np.arange(1, 5),
                 z_to_binary_mapping=lambda x: np.array(x) > 2,
@@ -59,8 +60,8 @@ def gridsearch_jerome_data(
     else:
         def model_generator(idx):
 
-            l1_vals = np.linspace(LOW_L1, HIGH_L1, N_STEPS_L1)
-            l3_vals = np.linspace(LOW_L3, HIGH_L3, N_STEPS_L3)
+            l1_vals = np.logspace(LOW_L1, HIGH_L1, N_STEPS_L1)
+            l3_vals = np.logspace(LOW_L3, HIGH_L3, N_STEPS_L3)
 
             return DGDClassifier(
                 lambda0=1.0,
@@ -68,6 +69,7 @@ def gridsearch_jerome_data(
                 lambda2=l1_vals[idx // N_STEPS_L3],
                 lambda3=l3_vals[idx % N_STEPS_L3],
                 K=5,
+                theta=THETA_EST,
                 domain_z=np.arange(1, 5),
                 z_to_binary_mapping=lambda x: np.array(x) > 2,
                 T=321,

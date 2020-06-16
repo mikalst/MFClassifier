@@ -2,9 +2,9 @@ import sys
 import numpy as np
 import tqdm.autonotebook as tqdm
 
-from .model import DGDClassifier
+from .model import MFClassifier
 
-class DGDClassifierTesting(DGDClassifier):
+class MFClassifierTesting(MFClassifier):
     """An extension of the MatrixFactorization class. Used for testing.
     """
 
@@ -49,3 +49,34 @@ class DGDClassifierTesting(DGDClassifier):
                 pbar.update(1)
                 if converged:
                     break
+
+    def set_data(self, X_train):
+        """Fit model.
+
+        Prepare model for training procedure.
+
+        Parameters
+        ----------
+        X_train : array_like, shape (n_samples_train, time_granularity)
+            The training set.
+
+        Returns
+        -------
+        self
+            Fitted estimator
+        """
+        self.X_train = X_train
+        self.nonzero_rows, self.nonzero_cols = np.nonzero(self.X_train)
+        self.N = self.X_train.shape[0]
+
+        # Initialize U
+        self.U_ = np.ones((self.N, self.R))
+        self.U_old = np.zeros((self.N, self.R))
+        # Initialize V
+        self.V_ = np.ones((self.T, self.R)) * np.linspace(self.domain_z[0], self.domain_z[-1], self.R)
+        self.V_old = np.zeros((self.T, self.R))
+        # Initialize S
+        self.Xi_ = self.X_train.copy()
+
+        # Train
+        self.n_iter_ = 0

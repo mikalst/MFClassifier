@@ -54,7 +54,9 @@ class TemporalDatasetPredict(_TemporalDataset):
         self.y = y_true[self.valid_rows]
         self.X = self.X[self.valid_rows]
         self.time_of_prediction = time_of_prediction[self.valid_rows]
-        if not(ground_truth is None):
+
+        self.ground_truth = ground_truth
+        if not(self.ground_truth is None):
             self.ground_truth = ground_truth[self.valid_rows]
 
     @property
@@ -111,13 +113,13 @@ class TemporalDatasetKFold(_TemporalDataset):
 
     @property
     def ground_truth_train(self):
-        if (self.ground_truth is None):
+        if (self.__train_obj.ground_truth is None):
             return None
         return self.__train_obj.ground_truth[self.__idc_train]
 
     @property
     def ground_truth_pred(self):
-        if (self.ground_truth is None):
+        if (self.__pred_obj.ground_truth is None):
             return None
         return self.__pred_obj.ground_truth[self.__idc_pred]
 

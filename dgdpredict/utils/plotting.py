@@ -239,7 +239,7 @@ def plot_visual_continuous(
     else:
         plt.savefig(
             output_file,
-            dpi=1000, 
+            dpi=1500, 
             # Plot will be occupy a maximum of available space
             bbox_inches='tight'
         )

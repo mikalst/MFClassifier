@@ -1,3 +1,11 @@
-# The Discrete Gaussian Distribution (DGD) prediction model.
+# The Matrix Factorization Classifier.
 
-The DGD prediction model combines matrix completion with the assumption of a discrete gaussian distribution to predict future states of temporal and sparse timeseries data.
+The MFClassifier is a forecasting model designed for highly sparse but low-rank data.
+
+# Motivation
+
+In my master's thesis, I used this model to predict cervical cancer in the female Norwegian population. 
+
+# Can I use this?
+
+Sure, if the model suits your needs.

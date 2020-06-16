@@ -2,9 +2,9 @@ import sys
 import numpy as np
 import tqdm.autonotebook as tqdm
 
-from .model import DGDClassifier
+from .model import MFClassifier
 
-class DGDClassifierTesting(DGDClassifier):
+class MFClassifierTesting(MFClassifier):
     """An extension of the MatrixFactorization class. Used for testing.
     """
 
@@ -70,12 +70,13 @@ class DGDClassifierTesting(DGDClassifier):
         self.N = self.X_train.shape[0]
 
         # Initialize U
-        self.U = np.ones((self.N, self.K))
-        self.U_old = np.zeros((self.N, self.K))
+        self.U_ = np.ones((self.N, self.R))
+        self.U_old = np.zeros((self.N, self.R))
         # Initialize V
-        self.V = np.ones((self.T, self.K)) * np.linspace(self.domain_z[0], self.domain_z[-1], self.K)
-        self.V_old = np.zeros((self.T, self.K))
+        self.V_ = np.ones((self.T, self.R)) * np.linspace(self.domain_z[0], self.domain_z[-1], self.R)
+        self.V_old = np.zeros((self.T, self.R))
         # Initialize S
-        self.S = self.X_train.copy()
+        self.Xi_ = self.X_train.copy()
 
+        # Train
         self.n_iter_ = 0

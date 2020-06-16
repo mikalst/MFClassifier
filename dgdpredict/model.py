@@ -9,16 +9,12 @@ from .data import TemporalDatasetPredict, TemporalDatasetKFold
 from .utils.special_matrices import finite_difference_matrix
 
 
-class DGDClassifier(ClassifierMixin):
+class MFClassifier(ClassifierMixin):
     """
-    Temporal Matrix Completion (MC) Classifier.
+    Matrix Factorization classifier for sparse temporal data.
 
-    DGDClassifier fits a matrix decomposition model M = U V^T, 
-    as the hidden matrix from which X_train is assumed to be entrywise
-    sampled through the discrete gaussian distribution. Targets are
-    predicted by computing their similarity (likelihood) to fitted profiles
-    (u1 V^T, ... un V^T) in the training set and computing the probability
-    that u1 V^T can result in state z at time t. 
+    MFClassifier fits a matrix factorization model M = U V^T as the latent
+    matrix of the training data.
 
     Parameters
     ----------
@@ -34,34 +30,25 @@ class DGDClassifier(ClassifierMixin):
     lambda3 : float, default=0.0
         Regularization parameter
 
-    K : int, default=5
+    R : int, default=5
         Rank estimate of decomposition
-
-    theta : float, default=2.5
-        Parameter for prediction using the dicrete gaussian distribution
 
     domain_z : array of shape=(n_classes_z), default=np.arange(1, 10),
         Allowed integer classes.
 
-    z_to_event_mapping : map, default=None
-        Mapping from allowed integer classes to allowed event classes.
-
-    domain_event : array of shape(n_classes_e), default=None
-        Allowed event classes.
-        
     z_to_binary_mapping : map, default=None
         Mapping from allowed integer classes to True/False.
     
     T : float, default=100
-        Time granularity.
+        Number of timesteps.
 
-    R : array of shape (T, T), default=None
+    D : array of shape (T, T), default=None
         Linear mapping used in regularization term.
 
-    J : array of shape (T, K), default=None
+    J : array of shape (T, R), default=None
         Offset matrix used in regularization term.
 
-    C : array of shape (T, T), default=None
+    K : array of shape (T, T), default=None
         Linear mapping used in regularization term.
 
     max_iter : int, default=100-
@@ -73,14 +60,17 @@ class DGDClassifier(ClassifierMixin):
 
     Attributes
     ----------
-    U : array of shape (n_samples, K)
+    U_ : array of shape (n_samples, R)
         Estimated profile weights for the matrix decomposition problem.
         
-    V : array of shape (T, K)
+    V_ : array of shape (T, R)
         Estimated time profiles for the matrix decomposition problem.
 
+    theta_ : float
+        Estimated theta in the Gaussian sampled distribution.
+
     n_iter_ : int
-        Actual number of iterations .
+        Actual number of iterations.
         
     """
 
@@ -90,19 +80,15 @@ class DGDClassifier(ClassifierMixin):
         lambda1=1.,
         lambda2=1.,
         lambda3=0.,
-        K=5,
-        theta=2.5,
+        R=5,
         domain_z=np.arange(1, 10),
-        z_to_event_mapping=None,
-        domain_event=None,
         z_to_binary_mapping=None,
         T=100,
-        R=None,
+        D=None,
         J=None,
-        C=None,
+        K=None,
         max_iter=1000,
         tol=1e-4,
-        new_init_method=False
     ):
         # Regularization parameters
         self.lambda0 = lambda0
@@ -110,111 +96,34 @@ class DGDClassifier(ClassifierMixin):
         self.lambda2 = lambda2
         self.lambda3 = lambda3
 
-        self.K = K  # Rank
-        self.theta = theta  # Parameter in the gaussian kernel
+        self.R = R  # Rank
         self.domain_z = domain_z  # Domain of integer values
-
-        self.z_to_event_mapping = z_to_event_mapping  # Mapping to secondary classifier
-        self.domain_event = domain_event  # Domain of secondary classifier
-
         self.z_to_binary_mapping = z_to_binary_mapping  # Mapping to binary classifier
-
         self.T = T  # Time granularity
 
-        self.R = R
-        if (self.R is None):
-            self.R = finite_difference_matrix(T)
+        self.D = D
+        if (self.D is None):
+            self.D = finite_difference_matrix(T)
         self.J = J
         if (self.J is None):
-            self.J = np.ones((T, K))   
-        self.C = C
-        if (self.C is None):
-            self.C = np.identity(T)
+            self.J = np.ones((T, R))   
+        self.K = K
+        if (self.K is None):
+            self.K = np.identity(T)
 
         self.n_iter_ = 0
         self.max_iter = max_iter
         self.tol = tol
 
         # Code optimization: static variables are computed and stored
-        self.RTCTCR = (self.C @ self.R).T@(self.C@self.R)
+        self.DTKTKV = (self.K @ self.D).T@(self.K@self.D)
         self.L2, self.Q2 = np.linalg.eigh(
-            (self.lambda3 / self.lambda0) * self.RTCTCR)
+            (self.lambda3 / self.lambda0) * self.DTKTKV)
 
         # Initialize prediction probabilities
         self.__proba_z_precomputed = None
         self.__ds_X_hash = None
         self.__ds_t_hash = None
-
-        self.new_init_method = new_init_method
-
-    def resetV(self):
-        self.V = np.ones((self.T, self.K)) * \
-            np.mean(self.X_train[self.nonzero_rows, self.nonzero_cols])
-        self.V_old = np.zeros((self.T, self.K))
-
-    def _solve1(self):
-        U = (
-            np.linalg.solve(
-                self.V.T @ self.V +
-                (self.lambda1 / self.lambda0) * np.identity(self.K),
-                self.V.T @ self.S.T,
-            )
-        ).T
-
-        return U
-
-    def _solve2(self):
-        L1, Q1 = np.linalg.eigh(
-            self.U.T @ self.U +
-            (self.lambda2 / self.lambda0) * np.identity(self.K)
-        )
-
-        # For efficiency purposes, these need to be evaluated in order
-        hatV = (
-            (self.Q2.T @ (self.S.T @ self.U + (self.lambda2 / self.lambda0) * self.J))
-            @ Q1
-            / np.add.outer(self.L2, L1)
-        )
-        V = self.Q2 @ (hatV @ Q1.T)
-
-        return V
-
-    def _solve3(self):
-        S = self.U @ self.V.T
-        S[self.nonzero_rows, self.nonzero_cols] = self.X_train[
-            self.nonzero_rows, self.nonzero_cols
-        ]
-
-        return S
-
-    def _solve_inner(self):
-        self.U = self._solve1()
-        self.V = self._solve2()
-        self.S = self._solve3()
-        return
-
-    def __next__(self):
-        if self.n_iter_ % 50 == 0:
-            self.U_old = np.copy(self.U)
-            self.V_old = np.copy(self.V)
-            self._solve_inner()
-            self.n_iter_ += 1
-            if (
-                np.linalg.norm(self.U_old @ self.V_old.T - self.U @ self.V.T)
-                / np.linalg.norm(self.U @ self.V.T)
-                < self.tol
-            ) or self.n_iter_ > self.max_iter:
-                return True
-            return False
-        self._solve_inner()
-        self.n_iter_ += 1
-        return False
-
-    def __train(self):
-        while True:
-            converged = next(self)
-            if converged:
-                break
 
     def set_params(
         self,
@@ -222,15 +131,13 @@ class DGDClassifier(ClassifierMixin):
         lambda1=0.,
         lambda2=0.,
         lambda3=0.,
-        K=5,
-        theta=2.5,
+        R=5,
         domain_z=np.arange(1, 10),
-        z_to_e_mapping=None,
-        domain_e=None,
+        z_to_binary_mapping=None,
         T=100,
-        R=None,
+        D=None,
         J=None,
-        C=None,
+        K=None,
         max_iter=1000,
         tol=1e-4
     ):
@@ -240,32 +147,28 @@ class DGDClassifier(ClassifierMixin):
         self.lambda2 = lambda2
         self.lambda3 = lambda3
 
-        self.K = K  # Rank
-        self.theta = theta  # Parameter in the gaussian kernel
+        self.R = R  # Rank
         self.domain_z = domain_z  # Domain of integer values
-
-        self.z_to_e_mapping = z_to_e_mapping  # Mapping to secondary classifier
-        self.domain_e = domain_e  # Domain of secondary classifier
-
+        self.z_to_binary_mapping = z_to_binary_mapping  # Mapping to binary classifier
         self.T = T  # Time granularity
 
-        if (R is None):
-            self.R = finite_difference_matrix(T)
+        if (D is None):
+            self.D = finite_difference_matrix(T)
 
         if (J is None):
-            self.J = np.zeros((T, K))
+            self.J = np.zeros((T, R))
 
-        if (C is None):
-            self.C = np.identity(T)
+        if (K is None):
+            self.K = np.identity(T)
 
         self.n_iter_ = 0
         self.max_iter = max_iter
         self.tol = tol
 
         # Code optimization: fixed variables are computed and stored
-        self.RTCTCR = (self.C @ self.R).T@(self.C@self.R)
+        self.DTKTKV = (self.K @ self.D).T@(self.K@self.D)
         self.L2, self.Q2 = np.linalg.eigh(
-            (self.lambda3 / self.lambda0) * self.RTCTCR)
+            (self.lambda3 / self.lambda0) * self.DTKTKV)
 
     def get_params(self, deep=True):
         # Regularization parameters
@@ -274,15 +177,15 @@ class DGDClassifier(ClassifierMixin):
             'lambda1': self.lambda1,
             'lambda2': self.lambda2,
             'lambda3': self.lambda3,
-            'K': self.K,
+            'R': self.R,
             'theta': self.theta,
             'domain_z': self.domain_z,
             'z_to_e_mapping': self.z_to_e_mapping,
             'domain_e': self.domain_e,
             'T': self.T,
-            'R': self.R,
+            'D': self.D,
             'J': self.J,
-            'C': self.C,
+            'K': self.K,
             'max_iter': self.max_iter,
             'tol': self.tol
         }
@@ -292,6 +195,70 @@ class DGDClassifier(ClassifierMixin):
 
         return params
 
+    def _solve1(self):
+        U = (
+            np.linalg.solve(
+                self.V_.T @ self.V_ +
+                (self.lambda1 / self.lambda0) * np.identity(self.R),
+                self.V_.T @ self.Xi_.T,
+            )
+        ).T
+
+        return U
+
+    def _solve2(self):
+        L1, Q1 = np.linalg.eigh(
+            self.U_.T @ self.U_ +
+            (self.lambda2 / self.lambda0) * np.identity(self.R)
+        )
+
+        # For efficiency purposes, these need to be evaluated in order
+        hatV = (
+            (self.Q2.T @ (self.Xi_.T @ self.U_ + (self.lambda2 / self.lambda0) * self.J))
+            @ Q1
+            / np.add.outer(self.L2, L1)
+        )
+        V = self.Q2 @ (hatV @ Q1.T)
+
+        return V
+
+    def _solve3(self):
+        Xi = self.U_ @ self.V_.T
+        Xi[self.nonzero_rows, self.nonzero_cols] = self.X_train[
+            self.nonzero_rows, self.nonzero_cols
+        ]
+
+        return Xi
+
+    def _solve_inner(self):
+        self.U_ = self._solve1()
+        self.V_ = self._solve2()
+        self.Xi_ = self._solve3()
+        return
+
+    def __next__(self):
+        if self.n_iter_ % 50 == 0:
+            self.U_old = np.copy(self.U_)
+            self.V_old = np.copy(self.V_)
+            self._solve_inner()
+            self.n_iter_ += 1
+            if (
+                np.linalg.norm(self.U_old @ self.V_old.T - self.U_ @ self.V_.T)
+                / np.linalg.norm(self.U_ @ self.V_.T)
+                < self.tol
+            ) or self.n_iter_ > self.max_iter:
+                return True
+            return False
+        self._solve_inner()
+        self.n_iter_ += 1
+        return False
+
+    def _fit(self):
+        while True:
+            converged = next(self)
+            if converged:
+                break
+
     def fit(self, X_train):
         """Fit model.
 
@@ -299,7 +266,7 @@ class DGDClassifier(ClassifierMixin):
 
         Parameters
         ----------
-        X_train : array_like, shape (n_samples_train, time_granularity)
+        X_train : array_like, shape (n_samples_train, n_timesteps)
             The training set.
 
         Returns
@@ -312,18 +279,20 @@ class DGDClassifier(ClassifierMixin):
         self.N = self.X_train.shape[0]
 
         # Initialize U
-        self.U = np.ones((self.N, self.K))
-        self.U_old = np.zeros((self.N, self.K))
+        self.U_ = np.ones((self.N, self.R))
+        self.U_old = np.zeros((self.N, self.R))
         # Initialize V
-        self.V = np.ones((self.T, self.K)) * np.linspace(self.domain_z[0], self.domain_z[-1], self.K)
-        self.V_old = np.zeros((self.T, self.K))
+        self.V_ = np.ones((self.T, self.R)) * np.linspace(self.domain_z[0], self.domain_z[-1], self.R)
+        self.V_old = np.zeros((self.T, self.R))
         # Initialize S
-        self.S = self.X_train.copy()
+        self.Xi_ = self.X_train.copy()
 
+        # Train
         self.n_iter_ = 0
+        self._fit()
 
-        # __train
-        self.__train()
+        # Estimate theta
+        self.theta = np.sqrt(np.mean(((self.X_train - self.U_@self.V_.T)[self.X_train > 0])**2))
 
     def _loglikelihood(self, X):
         """Compute loglikelihood of X having originated from 
@@ -336,7 +305,7 @@ class DGDClassifier(ClassifierMixin):
 
         Parameters
         ----------
-        X : array_like, shape (n_samples, time_granularity)
+        X : array_like, shape (n_samples, n_timesteps)
             The regressor set.
 
         Returns
@@ -344,7 +313,7 @@ class DGDClassifier(ClassifierMixin):
         logL : array_like, shape (n_samples, n_samples_train)
             The logs of the estimated likelihoods.
         """
-        M_train = self.U @ self.V.T
+        M_train = self.U_ @ self.V_.T
 
         N_1 = M_train.shape[0]
         N_2 = X.shape[0]
@@ -369,7 +338,7 @@ class DGDClassifier(ClassifierMixin):
 
         Parameters
         ----------
-        X : array_like, shape (n_samples, time_granularity)
+        X : array_like, shape (n_samples, n_timesteps)
             The regressor set.
 
         t : array_like, shape (n_samples, )
@@ -394,7 +363,7 @@ class DGDClassifier(ClassifierMixin):
 
         Parameters
         ----------
-        X : array_like, shape (n_samples, time_granularity)
+        X : array_like, shape (n_samples, n_timesteps)
             The regressor set.
 
         t : array_like, shape (n_samples, )
@@ -418,7 +387,7 @@ class DGDClassifier(ClassifierMixin):
 
         Parameters
         ----------
-        X : array_like, shape (n_samples, time_granularity)
+        X : array_like, shape (n_samples, n_timesteps)
             The regressor set.
 
         t : array_like, shape (n_samples, )
@@ -438,7 +407,7 @@ class DGDClassifier(ClassifierMixin):
         X, t = X, t
 
         logL = self._loglikelihood(X)
-        trainM = self.U @ self.V.T
+        trainM = self.U_ @ self.V_.T
 
         proba_z = np.empty((X.shape[0], self.domain_z.shape[0]))
 
@@ -455,40 +424,6 @@ class DGDClassifier(ClassifierMixin):
 
         return proba_z_normalized
 
-    def predict_proba_event(self, X, t):
-        """Compute event probabilities.
-
-        For all (x_i, t_i) in (X, t), compute the estimated
-        probability that row i will at time t be in the event
-        e for e in the domain_event of the model.
-
-        Parameters
-        ----------
-        X : array_like, shape (n_samples, time_granularity)
-            The regressor set.
-
-        t : array_like, shape (n_samples, )
-            Time of prediction.
-
-        Returns
-        -------
-        proba_event
-            The probalities
-        """
-        proba_z = self.predict_proba(X, t)
-
-        proba_event = np.empty((proba_z.shape[0], self.domain_e.shape[0]))
-
-        for i_event, e in enumerate(self.domain_e):
-
-            values_of_z_where_e_happens = np.argwhere(
-                [self.z_to_e_mapping(z) for z in self.domain_z] == e)
-
-            proba_event[:, i_event] = (
-                np.sum(proba_z[:, values_of_z_where_e_happens], axis=1)).flatten()
-
-        return proba_event
-
     def predict_proba_binary(self, X, t):
         """Compute binary probabilities.
 
@@ -497,7 +432,7 @@ class DGDClassifier(ClassifierMixin):
 
         Parameters
         ----------
-        X : array_like, shape (n_samples, time_granularity)
+        X : array_like, shape (n_samples, n_timesteps)
             The regressor set.
 
         t : array_like, shape (n_samples, )
@@ -528,7 +463,7 @@ class DGDClassifier(ClassifierMixin):
 
         Parameters
         ----------
-        X : array_like, shape (n_samples, time_granularity)
+        X : array_like, shape (n_samples, n_timesteps)
             The regressor set.
 
         t : array_like, shape (n_samples, )
@@ -549,34 +484,6 @@ class DGDClassifier(ClassifierMixin):
         else:
             return self.domain_z[np.argmax(proba_z*bias_z, axis=1)]
 
-    def predict_event(self, X, t, bias_e=None):
-        """Predict future event.
-
-        For all (x_i, t_i) in (X, t), predict the most probable
-        event e at time t.
-
-        Parameters
-        ----------
-        X : array_like, shape (n_samples, time_granularity)
-            The regressor set.
-
-        t : array_like, shape (n_samples, )
-            Time of prediction.
-
-        bias : array_like, shape (n_states_e, )
-            The bias of the model.
-
-        Returns
-        -------
-        e_states : (n_samples, )
-            The predicted states.
-        """
-        proba_e = self.predict_proba_event(X, t)
-        if bias_e is None:
-            return self.domain_e[np.argmax(proba_e, axis=1)]
-        else:
-            return self.domain_e[np.argmax(proba_e*bias_e, axis=1)]
-
     def predict_binary(self, X, t, bias_bin=None):
         """Predict future binary outcome.
 
@@ -585,7 +492,7 @@ class DGDClassifier(ClassifierMixin):
 
         Parameters
         ----------
-        X : array_like, shape (n_samples, time_granularity)
+        X : array_like, shape (n_samples, n_timesteps)
             The regressor set.
 
         t : array_like, shape (n_samples, )
